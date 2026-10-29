@@ -199,6 +199,52 @@ app.whenReady().then(()=>{
       const pinReport=document.querySelector('#linkList .linkPinReport')?.textContent||'';
       if(!pinReport.includes('BLOCKED')||!pinReport.includes('Logic-level mismatch')||!pinReport.includes('RX: 0'))
        throw Error('Packaged GUI did not render source-backed pin references with voltage warning');
+      // Explicit saved selections: known 5V/3.3V direct signal plans must be rejected.
+      let mismatchDenied=false;
+      try{await api.assignWorkspacePins(ws.id,planned.id,{
+       orientation:'source-controller',source:{tx:'1',rx:'0'},target:{tx:'17',rx:'16'}
+      });}catch(e){mismatchDenied=String(e.message||e).includes('Logic-level mismatch');}
+      if(!mismatchDenied||(await api.listWorkspaces()).find(w=>w.id===ws.id)?.links?.[0]?.pins)
+       throw Error('Mixed-voltage signal map was not rejected without mutation');
+      // Genuine positive UI path: same-voltage ESP32+ESP8266 distinct targets, no active GPIO conflicts.
+      const third=await api.createProject('SerialCompanion','esp8266:esp8266:generic');
+      await api.addToWorkspace(ws.id,third.id);
+      await refreshWorkspaces();await refreshProjects(false);
+      document.getElementById('linkSource').value=other.id;
+      document.getElementById('linkTarget').value=third.id;
+      document.getElementById('linkKind').value='uart';
+      document.getElementById('linkCreate').click();
+      for(let i=0;i<35&&(await api.listWorkspaces()).find(w=>w.id===ws.id)?.links?.length<2;i++)await pause(80);
+      const pair=(await api.listWorkspaces()).find(w=>w.id===ws.id)?.links?.find(l=>l.from===other.id&&l.to===third.id);
+      if(!pair)throw Error('Positive signal plan link could not be created through GUI');
+      const edit=document.querySelector('#linkList [data-edit-signal-plan="'+pair.id+'"]');
+      if(!edit)throw Error('Missing explicit GPIO assignment editor');
+      edit.click();
+      const editor=document.querySelector('#linkList [data-link-signal-editor="'+pair.id+'"]');
+      if(!editor||!editor.querySelector('[data-save-signal-plan]'))throw Error('Pin assignment editor did not open');
+      for(const [side,values] of [['source',{tx:'17',rx:'16'}],['target',{tx:'1',rx:'3'}]]){
+       for(const [role,pin] of Object.entries(values)){
+        const input=editor.querySelector('[data-signal-side="'+side+'"][data-signal-role="'+role+'"]');
+        if(!input)throw Error('Missing '+side+' '+role+' input');
+        input.value=pin;
+       }
+      }
+      editor.querySelector('[data-save-signal-plan]').click();
+      for(let i=0;i<35&&!(await api.listWorkspaces()).find(w=>w.id===ws.id)?.links?.find(l=>l.id===pair.id)?.pins;i++)await pause(80);
+      const assigned=(await api.listWorkspaces()).find(w=>w.id===ws.id)?.links?.find(l=>l.id===pair.id)?.pins;
+      if(assigned?.source?.tx!=='17'||assigned?.source?.rx!=='16'||assigned?.target?.tx!=='1'||assigned?.target?.rx!=='3')
+       throw Error('GUI did not persist correct GPIO selections');
+      for(let i=0;i<30&&!document.querySelector('#linkList [data-clear-signal-plan="'+pair.id+'"]');i++)await pause(80);
+      const clear=document.querySelector('#linkList [data-clear-signal-plan="'+pair.id+'"]');
+      if(!clear)throw Error('Saved selections not shown as clearable planning metadata');
+      clear.click();
+      for(let i=0;i<35&&(await api.listWorkspaces()).find(w=>w.id===ws.id)?.links?.find(l=>l.id===pair.id)?.pins;i++)await pause(80);
+      if((await api.listWorkspaces()).find(w=>w.id===ws.id)?.links?.find(l=>l.id===pair.id)?.pins)
+       throw Error('GUI failed to clear signal-plan metadata');
+      document.querySelector('#linkList [data-remove-workspace-link="'+pair.id+'"]').click();
+      for(let i=0;i<35&&(await api.listWorkspaces()).find(w=>w.id===ws.id)?.links?.some(l=>l.id===pair.id);i++)await pause(80);
+      if((await api.listWorkspaces()).find(w=>w.id===ws.id)?.links?.some(l=>l.id===pair.id))
+       throw Error('Positive plan cleanup failed');
       document.querySelector('#linkList [data-remove-workspace-link="'+planned.id+'"]').click();
       for(let i=0;i<30&&(await api.listWorkspaces()).find(w=>w.id===ws.id)?.links?.length;i++)await pause(80);
       if((await api.listWorkspaces()).find(w=>w.id===ws.id)?.links?.length)throw Error('Device link UI did not remove planned link');
@@ -226,7 +272,7 @@ app.whenReady().then(()=>{
       if(trace.outputs['13']!=='LOW'||trace.virtualTimeMs!==2000)throw Error('Simulator output mismatch');
       const resources=await api.resourceAnalyze(reopened,null,{intervalSeconds:10,bytesPerRecord:48,capacityBytes:1048576,retentionDays:7});
       if(resources.storage.recordsDay!==8640)throw Error('Resource advisor IPC mismatch');
-      return {passed:true,renderer:true,ipc:true,boardCatalog:true,newProjectUI:true,paletteDragDrop:true,inspectorEdit:true,persistence:true,generation:true,curatedWireGUI:true,workspaceTabUI:true,workspaceLinkUI:true,workspaceLinkAdvisorUI:true,workspaceLinkPinUI:true,sessionRestoreUI:true,typedVariableUI:true,analogThresholdFirmware:true,analogSimulation:true,reviewedEspGpioUI:true,typedDataLinkGUI:true,typedDataDragGUI:true,simulation:true,resources:true};
+      return {passed:true,renderer:true,ipc:true,boardCatalog:true,newProjectUI:true,paletteDragDrop:true,inspectorEdit:true,persistence:true,generation:true,curatedWireGUI:true,workspaceTabUI:true,workspaceLinkUI:true,workspaceLinkAdvisorUI:true,workspaceLinkPinUI:true,workspaceSignalPlanUI:true,sessionRestoreUI:true,typedVariableUI:true,analogThresholdFirmware:true,analogSimulation:true,reviewedEspGpioUI:true,typedDataLinkGUI:true,typedDataDragGUI:true,simulation:true,resources:true};
     })()`);
    }catch(e){report={passed:false,error:String(e?.stack||e)};}
    try{fs.writeFileSync(process.env.BLAZE_MCU_SMOKE_FILE,JSON.stringify(report,null,2));}catch(e){console.error('SMOKE REPORT WRITE FAILED',e);}
@@ -235,6 +281,8 @@ app.whenReady().then(()=>{
  }
 
  register('session:load',()=>desktopSession.load());register('session:save',state=>desktopSession.save(state));
+ register('workspace:assignPins',(id,linkId,input)=>workspaceCatalog.assignPins(id,linkId,input));
+ register('workspace:clearPins',(id,linkId)=>workspaceCatalog.clearPins(id,linkId));
  register('workspace:pinReference',(id,linkId,orientation)=>workspaceCatalog.pinReference(id,linkId,orientation));
  register('workspace:assess',(id,linkId)=>workspaceCatalog.assess(id,linkId));
  register('workspace:link',(id,from,to,kind)=>workspaceCatalog.link(id,from,to,kind));register('workspace:unlink',(id,linkId)=>workspaceCatalog.unlink(id,linkId));

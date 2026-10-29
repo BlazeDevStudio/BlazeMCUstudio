@@ -50,6 +50,13 @@ function renderWorkspaceLinks(){
   '</strong><small>'+escapeHTML(l.kind.toUpperCase())+' · '+(l.available?'Plan only, not connected':'Endpoint missing / recoverable')+
   '</small>'+(l.kind==='i2c'||l.kind==='spi'?
     '<label class="hint">Bus controller <select aria-label="Choose planned controller endpoint" data-pin-orientation="'+escapeHTML(l.id)+'"><option value="source-controller">Source</option><option value="target-controller">Target</option></select></label>':'')+
+  (['uart','i2c','spi'].includes(l.kind)?
+   '<button data-edit-signal-plan="'+escapeHTML(l.id)+'" title="Enter pin selections for this saved plan">Assign pins</button>'+
+   (l.pins?'<button data-clear-signal-plan="'+escapeHTML(l.id)+'">Clear pins</button>':'')+
+   '<div class="linkSignalEditor" data-link-signal-editor="'+escapeHTML(l.id)+'"></div>'+
+   (l.pins?'<small>Saved selections (NOT connected): '+['source','target'].map(side=>
+     side+': '+Object.entries(l.pins[side]).map(([key,pin])=>escapeHTML(key.toUpperCase()+': '+pin)).join(', ')).join(' · ')+'</small>':'')
+   :'')+
   '<button data-pin-reference="'+escapeHTML(l.id)+'" title="View reference pins only, no wiring approval">Pin reference</button>'+
   '<div class="linkPinReport" data-link-pin-report="'+escapeHTML(l.id)+'" aria-live="polite"></div>'+
   '<button data-assess-workspace-link="'+escapeHTML(l.id)+'" title="Check current boards and known limitations">Review compatibility</button>'+
@@ -349,6 +356,53 @@ $('#linkCreate').onclick=async()=>{
  }catch(e){log('Device plan rejected: '+e.message);}
 };
 $('#linkList').addEventListener('click',async e=>{
+ const edit=e.target.closest('[data-edit-signal-plan]');
+ if(edit&&currentWorkspaceId){
+  const linkId=edit.dataset.editSignalPlan;
+  const link=workspaces.find(w=>w.id===currentWorkspaceId)?.links.find(l=>l.id===linkId);
+  const row=edit.closest('.workspaceLinkRow'),holder=row?.querySelector('[data-link-signal-editor]');
+  if(!holder||!link)return;
+  const signals={uart:['tx','rx'],i2c:['sda','scl'],spi:['sck','miso','mosi','cs']}[link.kind];
+  if(!signals)return;
+  const value=link.pins||{};
+  const orientation=value.orientation||row.querySelector('[data-pin-orientation]')?.value||'source-controller';
+  const fields=side=>'<fieldset><legend>'+escapeHTML(side)+' pins</legend>'+signals.map(role=>
+   '<label>'+escapeHTML(role.toUpperCase())+'<input data-signal-side="'+side+'" data-signal-role="'+role+
+   '" maxlength="4" placeholder="GPIO" value="'+escapeHTML(value[side]?.[role]||'')+'"></label>').join('')+'</fieldset>';
+  holder.innerHTML='<p class="hint">Manual signal selections. No wiring or firmware changes.</p>'+
+   '<label>Proposed bus controller <select data-signal-orientation><option value="source-controller"'+(orientation==='source-controller'?' selected':'')+'>Source</option><option value="target-controller"'+(orientation==='target-controller'?' selected':'')+'>Target</option></select></label>'+
+   fields('source')+fields('target')+
+   '<button data-save-signal-plan="'+escapeHTML(linkId)+'">Save selections</button>'+
+   '<button data-cancel-signal-plan>Cancel</button><div class="hint" data-signal-message aria-live="polite"></div>';
+  return;
+ }
+ const cancel=e.target.closest('[data-cancel-signal-plan]');
+ if(cancel){const holder=cancel.closest('[data-link-signal-editor]');if(holder)holder.innerHTML='';return;}
+ const saveButton=e.target.closest('[data-save-signal-plan]');
+ if(saveButton&&currentWorkspaceId){
+  const id=saveButton.dataset.saveSignalPlan,workspaceId=currentWorkspaceId;
+  const holder=saveButton.closest('[data-link-signal-editor]'),message=holder?.querySelector('[data-signal-message]');
+  const link=workspaces.find(w=>w.id===workspaceId)?.links.find(l=>l.id===id);
+  if(!holder||!message||!link)return;
+  const input={orientation:holder.querySelector('[data-signal-orientation]').value,source:{},target:{}};
+  for(const side of ['source','target'])for(const el of holder.querySelectorAll('[data-signal-side="'+side+'"]'))
+   input[side][el.dataset.signalRole]=el.value.trim();
+  saveButton.disabled=true;message.textContent='Checking pin ownership and board constraints…';
+  try{await window.blaze.assignWorkspacePins(workspaceId,id,input);
+   await refreshWorkspaces();await refreshProjects(false);
+   log('Saved selected GPIO numbers as planning metadata only. Electrical and firmware approval remain unavailable.');
+  }catch(err){if(message.isConnected)message.textContent='Cannot save: '+String(err.message||err);
+   if(saveButton.isConnected)saveButton.disabled=false;}
+  return;
+ }
+ const clearButton=e.target.closest('[data-clear-signal-plan]');
+ if(clearButton&&currentWorkspaceId){
+  const workspaceId=currentWorkspaceId,linkId=clearButton.dataset.clearSignalPlan;
+  try{await window.blaze.clearWorkspacePins(workspaceId,linkId);
+   await refreshWorkspaces();await refreshProjects(false);log('Cleared selected pins. Firmware unchanged.');
+  }catch(err){log('Cannot clear selected pins: '+String(err.message||err));}
+  return;
+ }
  const pinsButton=e.target.closest('[data-pin-reference]');
  if(pinsButton&&currentWorkspaceId){
   const workspaceId=currentWorkspaceId,linkId=pinsButton.dataset.pinReference;

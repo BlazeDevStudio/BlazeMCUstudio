@@ -27,3 +27,7 @@ Each persisted plan has a **Review compatibility** action. The read-only assessm
 ## Default signal references (v0.4.10)
 
 The **Pin reference** action on each saved plan opens the endpoint projects and displays documented UART, I²C or SPI GPIO defaults, proposed bus-controller direction, active firmware/peripheral pin collisions and known boot/voltage blockers. These are transient display recommendations, not saved pin allocations. No carrier-specific wiring or firmware is generated. See [PIN_REFERENCES.md](PIN_REFERENCES.md).
+
+## Explicit saved signal selection (v0.4.11)
+
+The **Assign pins** action lets users save a role-specific GPIO mapping for an existing UART, I²C or SPI link, and **Clear pins** removes it. The saved record is independent of firmware and does not allocate an actual connection. Collision and voltage validation fail closed; board/carrier-specific electrical compatibility and real communication remain unverified. See [SIGNAL_PLANS.md](SIGNAL_PLANS.md).
