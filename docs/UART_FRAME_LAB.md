@@ -32,7 +32,7 @@ The source module declares a deterministic frame layout:
 | Payload (arbitrary binary, including `0xA5`) | 0–16 |
 | CRC-8 polynomial `0x07`, init `0x00` (over version through payload; no start marker) | 1 |
 
-**Maximum 22 bytes**, fixed storage, no heap allocation by the framing module, 250 ms incomplete-frame timeout with unsigned `millis()` wrap. Invalid kinds, versions, lengths, and CRC are rejected. Only an inert PING generates an echo PONG with the same sequence and payload; PONG produces no reply. The ESP32 sample sends a PING at one-second intervals and counts matching one-byte PONG responses in a volatile counter, with no GPIO outputs or serial debug text. The ESP8266 sample listens for and replies to PING. No security or authorization is implied by CRC or sequence numbers.
+**Maximum 22 bytes**, fixed storage, no heap allocation by the framing module, 250 ms incomplete-frame timeout with unsigned `millis()` wrap. Invalid kinds, versions, lengths, and CRC are rejected. Only an inert PING generates an echo PONG with the same sequence and payload; PONG produces no reply. The ESP32 sample sends a PING at one-second intervals and counts matching one-byte PONG responses in a loop-local-module counter, with no GPIO outputs or serial debug text. The ESP8266 sample listens for and replies to PING. No security or authorization is implied by CRC or sequence numbers.
 
 ## CI verification contract
 
