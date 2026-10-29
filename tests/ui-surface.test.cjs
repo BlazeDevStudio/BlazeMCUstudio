@@ -65,3 +65,15 @@ test('user-selected signal mapping uses bounded IPC with explicit save/clear and
  'data-edit-signal-plan','data-save-signal-plan','data-clear-signal-plan'])assert(source.includes(name),name);
  assert(main.includes('workspaceSignalPlanUI:true'));
 });
+
+test('current saved signal review IPC and visible stale-config recheck are required by packaged GUI',()=>{
+ const main=fs.readFileSync(path.join(__dirname,'../electron/main.cjs'),'utf8');
+ const preload=fs.readFileSync(path.join(__dirname,'../electron/preload.cjs'),'utf8');
+ const app=fs.readFileSync(path.join(root,'app.js'),'utf8');
+ assert(main.includes("'workspace:reviewPins'"));
+ assert(preload.includes("reviewWorkspacePins:'workspace:reviewPins'"));
+ assert(app.includes('data-review-saved-pins'));
+ assert(app.includes('window.blaze.reviewWorkspacePins(workspaceId,linkId)'));
+ assert(app.includes('not rechecked against current firmware'));
+ assert(main.includes('workspaceSignalReviewUI:true'));
+});
