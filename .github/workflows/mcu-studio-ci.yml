@@ -162,18 +162,18 @@ jobs:
           if(-not (Test-Path $env:BLAZE_MCU_SMOKE_FILE)) { throw "Packaged Windows GUI smoke timed out; launcher pid $($process.Id)" }
           $report=Get-Content $env:BLAZE_MCU_SMOKE_FILE -Raw | ConvertFrom-Json
           Get-Content $env:BLAZE_MCU_SMOKE_FILE
-          if(-not $report.passed -or -not $report.typedDataLinkGUI -or -not $report.typedDataDragGUI -or -not $report.workspaceTabUI -or -not $report.sessionRestoreUI -or -not $report.workspaceLinkUI -or -not $report.workspaceLinkAdvisorUI) { throw "Packaged GUI typed-socket and device-plan smoke failed: $($report.error) (linked=$($report.typedDataLinkGUI), drag=$($report.typedDataDragGUI))" }
+          if(-not $report.passed -or -not $report.typedDataLinkGUI -or -not $report.typedDataDragGUI -or -not $report.workspaceTabUI -or -not $report.sessionRestoreUI -or -not $report.workspaceLinkUI -or -not $report.workspaceLinkAdvisorUI -or -not $report.workspaceLinkPinUI) { throw "Packaged GUI typed-socket and device-plan smoke failed: $($report.error) (linked=$($report.typedDataLinkGUI), drag=$($report.typedDataDragGUI))" }
       - name: Archive exact checked-out source
         shell: pwsh
         if: always()
         run: |
           $base='${{ steps.locate.outputs.studio_dir }}'
           $items=@("$base/core","$base/renderer","$base/electron","$base/docs","$base/tests","$base/scripts","$base/examples","$base/package.json","$base/README.md",".github/workflows/mcu-studio-ci.yml")
-          Compress-Archive -Path $items -DestinationPath "$env:RUNNER_TEMP/blaze-mcu-v049-source.zip" -Force
+          Compress-Archive -Path $items -DestinationPath "$env:RUNNER_TEMP/blaze-mcu-v0410-source.zip" -Force
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: blaze-mcu-v049-session-build-evidence
+          name: blaze-mcu-v0410-session-build-evidence
           path: |
             ${{ steps.locate.outputs.studio_dir }}/dist/*.exe
             ${{ runner.temp }}/arduino-compile.log
@@ -187,7 +187,7 @@ jobs:
             ${{ runner.temp }}/arduino-install.log
             ${{ runner.temp }}/sha256.txt
             ${{ runner.temp }}/blaze-mcu-gui-smoke.json
-            ${{ runner.temp }}/blaze-mcu-v049-source.zip
+            ${{ runner.temp }}/blaze-mcu-v0410-source.zip
           if-no-files-found: warn
           retention-days: 14
 
@@ -261,7 +261,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: blaze-mcu-v049-${{ matrix.family }}-compile-evidence
+          name: blaze-mcu-v0410-${{ matrix.family }}-compile-evidence
           path: |
             ${{ runner.temp }}/cli-version.txt
             ${{ runner.temp }}/generated-esp-manifest.txt

@@ -83,3 +83,20 @@ test('assessment uses persisted endpoint board identity and fails closed after t
  assert.throws(()=>cat.assess(w.id,'../../escape'),/Invalid/);
  assert.throws(()=>cat.assess(w.id,a.id),/not found/);
 }));
+
+test('pin reference resolves stored source and target and denies unavailable/missing link IDs',()=>fixture((ps,cat)=>{
+ const uno=ps.create('Uno','arduino:avr:uno'),esp=ps.create('ESP','esp32:esp32:esp32');
+ const w=cat.create('Pins');cat.add(w.id,uno.id);cat.add(w.id,esp.id);
+ const l=cat.link(w.id,uno.id,esp.id,'uart').links[0];
+ const out=cat.pinReference(w.id,l.id);
+ assert.deepEqual(out.source.pins,{tx:'1',rx:'0'});
+ assert.deepEqual(out.target.pins,{tx:'1',rx:'3'});
+ assert.equal(out.status,'blocked');
+ assert.equal(out.safeToWire,false);
+ assert.throws(()=>cat.pinReference(w.id,'../bad'),/Invalid/);
+ assert.throws(()=>cat.pinReference(w.id,uno.id),/not found/);
+ ps.trash(esp.id);
+ const lost=cat.pinReference(w.id,l.id);
+ assert.equal(lost.status,'blocked');assert.equal(lost.target,null);
+ assert.match(lost.errors.join(' '),/unavailable/);
+}));

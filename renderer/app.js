@@ -48,7 +48,11 @@ function renderWorkspaceLinks(){
  $('#linkList').innerHTML=(w.links||[]).length?w.links.map(l=>
   '<div class="workspaceLinkRow '+(l.available?'':'unavailable')+'"><strong>'+title(l.from)+' → '+title(l.to)+
   '</strong><small>'+escapeHTML(l.kind.toUpperCase())+' · '+(l.available?'Plan only, not connected':'Endpoint missing / recoverable')+
-  '</small><button data-assess-workspace-link="'+escapeHTML(l.id)+'" title="Check current boards and known limitations">Review compatibility</button>'+
+  '</small>'+(l.kind==='i2c'||l.kind==='spi'?
+    '<label class="hint">Bus controller <select aria-label="Choose planned controller endpoint" data-pin-orientation="'+escapeHTML(l.id)+'"><option value="source-controller">Source</option><option value="target-controller">Target</option></select></label>':'')+
+  '<button data-pin-reference="'+escapeHTML(l.id)+'" title="View reference pins only, no wiring approval">Pin reference</button>'+
+  '<div class="linkPinReport" data-link-pin-report="'+escapeHTML(l.id)+'" aria-live="polite"></div>'+
+  '<button data-assess-workspace-link="'+escapeHTML(l.id)+'" title="Check current boards and known limitations">Review compatibility</button>'+
   '<button data-remove-workspace-link="'+escapeHTML(l.id)+'" title="Delete planned relationship only">Remove plan</button>'+
   '<div class="linkAssessment" data-link-assessment="'+escapeHTML(l.id)+'" aria-live="polite"></div></div>'
  ).join(''):'<p class="hint">No planned relationships in this workspace.</p>';
@@ -345,6 +349,30 @@ $('#linkCreate').onclick=async()=>{
  }catch(e){log('Device plan rejected: '+e.message);}
 };
 $('#linkList').addEventListener('click',async e=>{
+ const pinsButton=e.target.closest('[data-pin-reference]');
+ if(pinsButton&&currentWorkspaceId){
+  const workspaceId=currentWorkspaceId,linkId=pinsButton.dataset.pinReference;
+  const row=pinsButton.closest('.workspaceLinkRow');
+  const orientation=row?.querySelector('[data-pin-orientation]')?.value||'source-controller';
+  const target=row?.querySelector('[data-link-pin-report]');
+  if(!target)return;
+  target.textContent='Reading board pin references…';
+  try{
+   const out=await window.blaze.referenceWorkspacePins(workspaceId,linkId,orientation);
+   if(currentWorkspaceId!==workspaceId||!target.isConnected)return;
+   const endpoint=(side,x)=>x?
+    '<p><b>'+escapeHTML(side)+' ('+escapeHTML(x.role)+')</b> · '+escapeHTML(x.fqbn)+
+    '<small>'+Object.entries(x.pins).map(([role,pin])=>escapeHTML(role.toUpperCase()+': '+pin)).join(' · ')+'</small></p>':'';
+   const heading=out.status==='blocked'?'BLOCKED — do not wire':'REFERENCE ONLY — unverified';
+   target.innerHTML='<strong>'+escapeHTML(heading)+'</strong>'+
+    endpoint('Source',out.source)+endpoint('Target',out.target)+
+    (out.errors||[]).map(x=>'<p class="pinError">'+escapeHTML(x)+'</p>').join('')+
+    (out.warnings||[]).map(x=>'<p>'+escapeHTML(x)+'</p>').join('')+
+    '<small>Default GPIO references are not physical connector instructions or deployed firmware.</small>';
+   target.classList.toggle('blocked',out.status==='blocked');
+  }catch(err){if(target.isConnected)target.textContent='Reference unavailable: '+String(err.message||err);}
+  return;
+ }
  const check=e.target.closest('[data-assess-workspace-link]');
  if(check&&currentWorkspaceId){
   const workspaceId=currentWorkspaceId,linkId=check.dataset.assessWorkspaceLink;
