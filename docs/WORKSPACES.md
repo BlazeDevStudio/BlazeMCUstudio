@@ -19,3 +19,7 @@ A workspace can now persist a list of **planned communication links** between tw
 The `_workspaces.json` v1 format accepts an optional `links` array for compatibility with older catalogs. New workspaces include an empty array. Each link has a UUID and validated endpoint membership, transport, and timestamp. Duplicate directed transport pairs, self-links and unknown transport types are rejected. A project moved to recovery remains associated and the link is flagged unavailable until restoration. Explicitly removing a project from the workspace removes associated planning links but never the project's firmware. Deleting a workspace removes its relationships, not member projects. Corrupt or tampered links fail closed and cannot overwrite firmware files.
 
 Next admission gate: compatibility-aware source/target role selection, voltage/IO mapping, actionable warnings, and actual transport firmware generation for individually verified boards.
+
+## v0.4.9 compatibility review (non-electrical)
+
+Each persisted plan has a **Review compatibility** action. The read-only assessment resolves saved firmware projects and reports BLOCKED, REVIEW REQUIRED or UNKNOWN. Mismatched direct signal logic levels between Uno 5 V and ESP 3.3 V are blocked; no board pair is declared wired/working. The original topology and firmware remain unchanged. See [BOARD_COMPATIBILITY.md](BOARD_COMPATIBILITY.md).
