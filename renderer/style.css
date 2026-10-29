@@ -39,3 +39,10 @@
 .workspaceLinkRow small{display:block;color:var(--muted);margin-top:4px}
 .workspaceLinkRow button{font-size:11px;padding:4px 7px;margin-top:6px}
 .workspaceLinkRow.unavailable{border-left:3px solid var(--warn);padding-left:8px}
+
+/* Compatibility review is never a 'connected' or 'electrically safe' indicator. */
+.linkAssessment{padding:8px 3px 3px;font-size:11px;line-height:1.5;color:var(--warn);overflow-wrap:anywhere}
+.linkAssessment strong{display:block;letter-spacing:.02em}
+.linkAssessment p{margin:5px 0;color:var(--muted)}
+.linkAssessment.blocked{border-left:3px solid var(--danger);padding-left:8px}
+.linkAssessment.blocked strong{color:var(--danger)}

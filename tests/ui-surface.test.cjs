@@ -30,3 +30,14 @@ test('workspace link planner is exposed in GUI, preload, IPC and packaged smoke'
   assert(preload.includes(channel)&&main.includes(channel),channel);
  assert(main.includes('workspaceLinkUI:true'));
 });
+
+test('workspace board advisor uses saved link identity through scoped read-only IPC and a visible per-link action',()=>{
+ const source=fs.readFileSync(path.join(root,'app.js'),'utf8');
+ const electron=fs.readFileSync(path.join(__dirname,'../electron/main.cjs'),'utf8');
+ const preload=fs.readFileSync(path.join(__dirname,'../electron/preload.cjs'),'utf8');
+ assert(source.includes('window.blaze.assessWorkspaceLink(workspaceId,linkId)'));
+ assert(source.includes('data-assess-workspace-link'));
+ assert(electron.includes("'workspace:assess'"));
+ assert(preload.includes("assessWorkspaceLink:'workspace:assess'"));
+ assert(electron.includes('workspaceLinkAdvisorUI:true'));
+});

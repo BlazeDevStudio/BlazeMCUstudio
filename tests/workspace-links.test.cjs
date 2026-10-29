@@ -66,3 +66,20 @@ test('legacy catalog with no links continues to load; corrupt or dangling links 
  assert.equal(ps.open(b.id).name,'B');
  assert.ok(link.id);
 }));
+
+test('assessment uses persisted endpoint board identity and fails closed after trash',()=>fixture((ps,cat)=>{
+ const a=ps.create('Uno','arduino:avr:uno'),b=ps.create('ESP','esp32:esp32:esp32');
+ const w=cat.create('Hardware');cat.add(w.id,a.id);cat.add(w.id,b.id);
+ const link=cat.link(w.id,a.id,b.id,'uart').links[0];
+ const warning=cat.assess(w.id,link.id);
+ assert.equal(warning.status,'blocked');
+ assert.equal(warning.safeToWire,false);
+ assert.match(warning.errors.join(' '),/Logic-level mismatch/);
+ assert.equal(ps.open(a.id).fqbn,'arduino:avr:uno');
+ ps.trash(b.id);
+ const missing=cat.assess(w.id,link.id);
+ assert.equal(missing.status,'blocked');
+ assert.match(missing.errors.join(' '),/unavailable/);
+ assert.throws(()=>cat.assess(w.id,'../../escape'),/Invalid/);
+ assert.throws(()=>cat.assess(w.id,a.id),/not found/);
+}));

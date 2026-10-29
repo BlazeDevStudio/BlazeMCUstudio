@@ -175,6 +175,17 @@ app.whenReady().then(()=>{
       if(planned?.from!==saved.id||planned?.to!==other.id||planned?.kind!=='uart'
        ||!document.querySelector('#linkList [data-remove-workspace-link="'+planned.id+'"]'))
        throw Error('Device link UI did not create and render a persisted UART plan');
+      // Only review; the advisor must never claim a safe direct 5V Uno-to-3.3V ESP32 connection.
+      const linkAdvice=await api.assessWorkspaceLink(ws.id,planned.id);
+      if(linkAdvice.status!=='blocked'||linkAdvice.safeToWire!==false
+       ||!linkAdvice.errors.some(x=>x.includes('Logic-level mismatch')))
+       throw Error('Board compatibility advisor did not flag direct Uno/ESP signal voltage mismatch');
+      const reviewButton=document.querySelector('#linkList [data-assess-workspace-link="'+planned.id+'"]');
+      if(!reviewButton)throw Error('Saved link lacks visible compatibility review action');
+      reviewButton.click();
+      for(let i=0;i<40&&!document.querySelector('#linkList .linkAssessment')?.textContent.includes('Logic-level mismatch');i++)await pause(80);
+      if(!document.querySelector('#linkList .linkAssessment')?.textContent.includes('BLOCKED'))
+       throw Error('GUI did not render the blocking compatibility advisory');
       document.querySelector('#linkList [data-remove-workspace-link="'+planned.id+'"]').click();
       for(let i=0;i<30&&(await api.listWorkspaces()).find(w=>w.id===ws.id)?.links?.length;i++)await pause(80);
       if((await api.listWorkspaces()).find(w=>w.id===ws.id)?.links?.length)throw Error('Device link UI did not remove planned link');
@@ -202,7 +213,7 @@ app.whenReady().then(()=>{
       if(trace.outputs['13']!=='LOW'||trace.virtualTimeMs!==2000)throw Error('Simulator output mismatch');
       const resources=await api.resourceAnalyze(reopened,null,{intervalSeconds:10,bytesPerRecord:48,capacityBytes:1048576,retentionDays:7});
       if(resources.storage.recordsDay!==8640)throw Error('Resource advisor IPC mismatch');
-      return {passed:true,renderer:true,ipc:true,boardCatalog:true,newProjectUI:true,paletteDragDrop:true,inspectorEdit:true,persistence:true,generation:true,curatedWireGUI:true,workspaceTabUI:true,workspaceLinkUI:true,sessionRestoreUI:true,typedVariableUI:true,analogThresholdFirmware:true,analogSimulation:true,reviewedEspGpioUI:true,typedDataLinkGUI:true,typedDataDragGUI:true,simulation:true,resources:true};
+      return {passed:true,renderer:true,ipc:true,boardCatalog:true,newProjectUI:true,paletteDragDrop:true,inspectorEdit:true,persistence:true,generation:true,curatedWireGUI:true,workspaceTabUI:true,workspaceLinkUI:true,workspaceLinkAdvisorUI:true,sessionRestoreUI:true,typedVariableUI:true,analogThresholdFirmware:true,analogSimulation:true,reviewedEspGpioUI:true,typedDataLinkGUI:true,typedDataDragGUI:true,simulation:true,resources:true};
     })()`);
    }catch(e){report={passed:false,error:String(e?.stack||e)};}
    try{fs.writeFileSync(process.env.BLAZE_MCU_SMOKE_FILE,JSON.stringify(report,null,2));}catch(e){console.error('SMOKE REPORT WRITE FAILED',e);}
@@ -211,6 +222,7 @@ app.whenReady().then(()=>{
  }
 
  register('session:load',()=>desktopSession.load());register('session:save',state=>desktopSession.save(state));
+ register('workspace:assess',(id,linkId)=>workspaceCatalog.assess(id,linkId));
  register('workspace:link',(id,from,to,kind)=>workspaceCatalog.link(id,from,to,kind));register('workspace:unlink',(id,linkId)=>workspaceCatalog.unlink(id,linkId));
  register('workspace:list',()=>workspaceCatalog.list());register('workspace:create',name=>workspaceCatalog.create(name));register('workspace:rename',(id,name)=>workspaceCatalog.rename(id,name));register('workspace:add',(id,pid)=>workspaceCatalog.add(id,pid));register('workspace:remove',(id,pid)=>workspaceCatalog.remove(id,pid));register('workspace:delete',id=>workspaceCatalog.delete(id));register('project:list',()=>store.list());register('project:create',(name,fqbn,template)=>store.create(name,fqbn,template));register('project:open',id=>store.open(id));register('project:save',p=>store.save(p));
  register('project:validate',p=>{const d=generateSketch(p).diagnostics;return {...d,ordered:(d.ordered||[]).map(n=>n.id)};});register('project:generate',p=>generateSketch(p));
