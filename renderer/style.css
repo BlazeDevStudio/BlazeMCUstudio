@@ -27,3 +27,15 @@
 .projectTab.active{border-color:#58b7d9;background:#23475b;}
 .projectTab button{padding:5px 9px;font-size:12px;border:0;background:none;color:#e4ebf2;}
 .projectTab button.closeTab{font-weight:bold;padding:5px 8px;}
+
+/* Planning-only workspace topology: compact, keyboard-accessible controls. */
+.workspaceLinksPanel{margin:12px 0;padding:11px;border:1px solid var(--edge);border-radius:9px;background:#1c2635}
+.workspaceLinksPanel .labelrow{margin-bottom:8px}
+.workspaceLinksPanel label{display:block;margin:8px 0 3px}
+.workspaceLinksPanel select{padding:6px;margin-bottom:4px;min-width:0}
+.workspaceLinksPanel #linkCreate{margin:9px 0 7px}
+.workspaceLinkList{max-height:190px;overflow:auto;scrollbar-width:thin}
+.workspaceLinkRow{padding:8px 5px;border-bottom:1px solid var(--edge);overflow-wrap:anywhere}
+.workspaceLinkRow small{display:block;color:var(--muted);margin-top:4px}
+.workspaceLinkRow button{font-size:11px;padding:4px 7px;margin-top:6px}
+.workspaceLinkRow.unavailable{border-left:3px solid var(--warn);padding-left:8px}
