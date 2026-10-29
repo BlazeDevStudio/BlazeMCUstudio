@@ -235,6 +235,45 @@ app.whenReady().then(()=>{
       if(assigned?.source?.tx!=='17'||assigned?.source?.rx!=='16'||assigned?.target?.tx!=='1'||assigned?.target?.rx!=='3')
        throw Error('GUI did not persist correct GPIO selections');
       for(let i=0;i<30&&!document.querySelector('#linkList [data-clear-signal-plan="'+pair.id+'"]');i++)await pause(80);
+      // Recheck is read-only and must detect *later* firmware changes to saved plan pins.
+      const buttonRecheck=document.querySelector('#linkList [data-review-saved-pins="'+pair.id+'"]');
+      if(!buttonRecheck)throw Error('Saved signals lack a live recheck control');
+      const firstReview=await api.reviewWorkspacePins(ws.id,pair.id);
+      if(firstReview.status!=='review'||firstReview.safeToWire!==false)
+       throw Error('Saved pin plan did not give non-approved review status');
+      buttonRecheck.click();
+      // Refreshing the workspace intentionally resets any previous advisory to "not rechecked".
+      // Observe the complete result atomically; retry the visible control if that refresh
+      // replaces the report node before the IPC response has been rendered.
+      let confirmedReview=false,reviewText='';
+      for(let i=0;i<55;i++){
+       reviewText=document.querySelector('#linkList [data-link-saved-review="'+pair.id+'"]')?.textContent||'';
+       if(reviewText.includes('REVIEW REQUIRED')&&reviewText.includes('no wiring')){confirmedReview=true;break;}
+       if(i===20||i===40)document.querySelector('#linkList [data-review-saved-pins="'+pair.id+'"]')?.click();
+       await pause(80);
+      }
+      if(!confirmedReview)
+       throw Error('Packaged GUI failed to label current selections as unapproved: '+reviewText.slice(0,240));
+      const changed=await api.openProject(other.id);
+      changed.peripherals=[{id:'lateClaim17',type:'gpio',bus:'test',pins:{io:'17'}}];
+      await api.saveProject(changed);
+      const stale=await api.reviewWorkspacePins(ws.id,pair.id);
+      if(stale.status!=='blocked'||!stale.errors.some(e=>e.includes('reserved by a project peripheral')))
+       throw Error('Later project pin reservation did not invalidate saved signal plan');
+      let blockedShown=false,blockedText='';
+      for(let i=0;i<60;i++){
+       if(i===0||i===20||i===40)
+        document.querySelector('#linkList [data-review-saved-pins="'+pair.id+'"]')?.click();
+       blockedText=document.querySelector('#linkList [data-link-saved-review="'+pair.id+'"]')?.textContent||'';
+       if(blockedText.includes('BLOCKED')&&blockedText.includes('reserved by a project peripheral')){blockedShown=true;break;}
+       await pause(80);
+      }
+      if(!blockedShown)
+       throw Error('GUI did not visibly flag stale saved GPIO selections: '+blockedText.slice(0,240));
+      changed.peripherals=[];
+      await api.saveProject(changed);
+      if((await api.reviewWorkspacePins(ws.id,pair.id)).status!=='review')
+       throw Error('Removing stale project claim did not restore non-approved review');
       const clear=document.querySelector('#linkList [data-clear-signal-plan="'+pair.id+'"]');
       if(!clear)throw Error('Saved selections not shown as clearable planning metadata');
       clear.click();
@@ -272,7 +311,7 @@ app.whenReady().then(()=>{
       if(trace.outputs['13']!=='LOW'||trace.virtualTimeMs!==2000)throw Error('Simulator output mismatch');
       const resources=await api.resourceAnalyze(reopened,null,{intervalSeconds:10,bytesPerRecord:48,capacityBytes:1048576,retentionDays:7});
       if(resources.storage.recordsDay!==8640)throw Error('Resource advisor IPC mismatch');
-      return {passed:true,renderer:true,ipc:true,boardCatalog:true,newProjectUI:true,paletteDragDrop:true,inspectorEdit:true,persistence:true,generation:true,curatedWireGUI:true,workspaceTabUI:true,workspaceLinkUI:true,workspaceLinkAdvisorUI:true,workspaceLinkPinUI:true,workspaceSignalPlanUI:true,sessionRestoreUI:true,typedVariableUI:true,analogThresholdFirmware:true,analogSimulation:true,reviewedEspGpioUI:true,typedDataLinkGUI:true,typedDataDragGUI:true,simulation:true,resources:true};
+      return {passed:true,renderer:true,ipc:true,boardCatalog:true,newProjectUI:true,paletteDragDrop:true,inspectorEdit:true,persistence:true,generation:true,curatedWireGUI:true,workspaceTabUI:true,workspaceLinkUI:true,workspaceLinkAdvisorUI:true,workspaceLinkPinUI:true,workspaceSignalPlanUI:true,workspaceSignalReviewUI:true,sessionRestoreUI:true,typedVariableUI:true,analogThresholdFirmware:true,analogSimulation:true,reviewedEspGpioUI:true,typedDataLinkGUI:true,typedDataDragGUI:true,simulation:true,resources:true};
     })()`);
    }catch(e){report={passed:false,error:String(e?.stack||e)};}
    try{fs.writeFileSync(process.env.BLAZE_MCU_SMOKE_FILE,JSON.stringify(report,null,2));}catch(e){console.error('SMOKE REPORT WRITE FAILED',e);}
@@ -281,6 +320,7 @@ app.whenReady().then(()=>{
  }
 
  register('session:load',()=>desktopSession.load());register('session:save',state=>desktopSession.save(state));
+ register('workspace:reviewPins',(id,linkId)=>workspaceCatalog.reviewPins(id,linkId));
  register('workspace:assignPins',(id,linkId,input)=>workspaceCatalog.assignPins(id,linkId,input));
  register('workspace:clearPins',(id,linkId)=>workspaceCatalog.clearPins(id,linkId));
  register('workspace:pinReference',(id,linkId,orientation)=>workspaceCatalog.pinReference(id,linkId,orientation));

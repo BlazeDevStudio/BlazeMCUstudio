@@ -26,3 +26,15 @@ The persisted schema v1 remains backward compatible with pre-existing links with
 Node tests cover valid persistent mappings, no firmware mutation, cross-voltage rejection, active/peripheral GPIO collision, cross-link conflict, duplicate role and input-only GPIO, unknown/tampered schema, fixed pin restrictions and removal. Packaged Windows Electron smoke tests actual UI save/clear with ESP32↔ESP8266, negative mixed-voltage rejection with Uno↔ESP32, and existing board/firmware regressions.
 
 **This is a plan, not a real wire.** `safeToWire` and `firmwareGenerated` remain false. Actual hardware communication firmware, physical logic analyzer/level-shift checks and tested serial/I²C/SPI adapters are future separate acceptance gates.
+
+## Live recheck after firmware changes — v0.4.12
+
+Saved signal selections can become **stale** when firmware graph logic, project peripheral claims, board identity, or another workspace link changes. The **Recheck pins** button reads the current saved endpoint projects and the latest competing link claims. It does not mutate workspace or project files. A saved map always displays **not rechecked against current firmware** until the user requests a fresh review. Results are:
+
+- **BLOCKED** when a current GPIO conflict, board/electrical incompatibility, unavailable target, or competing link collision exists. The old saved plan is preserved for inspection or repair; it is never silently enabled.
+- **REVIEW REQUIRED** when no conflicts are found within the limited curated model; physical wiring, source manual-code ownership, peripheral drivers and voltage certification still require independent verification. Not a connection approval.
+- **UNASSIGNED** for old links without an explicit saved pin map.
+
+The earlier **Review compatibility** path now also incorporates live saved-pin blockers, so it cannot show a generic review-only result while the selected pins have become invalid. Board and adapter capability outside the curated model remains unverified; all review responses explicitly retain `safeToWire:false` and `firmwareGenerated:false`. The recheck is a snapshot, not a continuously monitored guarantee or hardware test.
+
+Automated negative tests cover stale peripheral/firmware edits, competing links, trashed/recovered projects, incompatible legacy saved maps, and invalid IDs. A packaged Windows GUI test must actually show an already-saved plan go from review-only to BLOCKED after a new peripheral reservation and return to review-only when repaired.

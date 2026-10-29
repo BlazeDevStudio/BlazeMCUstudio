@@ -52,7 +52,9 @@ function renderWorkspaceLinks(){
     '<label class="hint">Bus controller <select aria-label="Choose planned controller endpoint" data-pin-orientation="'+escapeHTML(l.id)+'"><option value="source-controller">Source</option><option value="target-controller">Target</option></select></label>':'')+
   (['uart','i2c','spi'].includes(l.kind)?
    '<button data-edit-signal-plan="'+escapeHTML(l.id)+'" title="Enter pin selections for this saved plan">Assign pins</button>'+
-   (l.pins?'<button data-clear-signal-plan="'+escapeHTML(l.id)+'">Clear pins</button>':'')+
+   (l.pins?'<button data-review-saved-pins="'+escapeHTML(l.id)+'" title="Check saved selections against current firmware and competing links">Recheck pins</button>'+
+    '<button data-clear-signal-plan="'+escapeHTML(l.id)+'">Clear pins</button>':'')+
+   (l.pins?'<div class="linkSavedPinReview" data-link-saved-review="'+escapeHTML(l.id)+'" aria-live="polite"><small>Stored selections — not rechecked against current firmware.</small></div>':'')+
    '<div class="linkSignalEditor" data-link-signal-editor="'+escapeHTML(l.id)+'"></div>'+
    (l.pins?'<small>Saved selections (NOT connected): '+['source','target'].map(side=>
      side+': '+Object.entries(l.pins[side]).map(([key,pin])=>escapeHTML(key.toUpperCase()+': '+pin)).join(', ')).join(' · ')+'</small>':'')
@@ -356,6 +358,25 @@ $('#linkCreate').onclick=async()=>{
  }catch(e){log('Device plan rejected: '+e.message);}
 };
 $('#linkList').addEventListener('click',async e=>{
+ const review=e.target.closest('[data-review-saved-pins]');
+ if(review&&currentWorkspaceId){
+  const workspaceId=currentWorkspaceId,linkId=review.dataset.reviewSavedPins;
+  const resultArea=review.closest('.workspaceLinkRow')?.querySelector('[data-link-saved-review]');
+  if(!resultArea)return;
+  resultArea.textContent='Rechecking saved pins against current projects…';
+  try{
+   const result=await window.blaze.reviewWorkspacePins(workspaceId,linkId);
+   if(workspaceId!==currentWorkspaceId||!resultArea.isConnected)return;
+   const status=result.status==='blocked'?'BLOCKED — saved pins conflict with current project state':
+    result.status==='unassigned'?'UNASSIGNED':'REVIEW REQUIRED — no wiring or firmware approval';
+   resultArea.innerHTML='<strong>'+escapeHTML(status)+'</strong>'+
+    (result.errors||[]).map(x=>'<p class="pinError">'+escapeHTML(x)+'</p>').join('')+
+    (result.warnings||[]).map(x=>'<p>'+escapeHTML(x)+'</p>').join('')+
+    '<small>This review is a software snapshot, not a hardware safety certificate.</small>';
+   resultArea.classList.toggle('blocked',result.status==='blocked');
+  }catch(err){if(resultArea.isConnected)resultArea.textContent='Recheck failed: '+String(err.message||err);}
+  return;
+ }
  const edit=e.target.closest('[data-edit-signal-plan]');
  if(edit&&currentWorkspaceId){
   const linkId=edit.dataset.editSignalPlan;
