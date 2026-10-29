@@ -186,6 +186,19 @@ app.whenReady().then(()=>{
       for(let i=0;i<40&&!document.querySelector('#linkList .linkAssessment')?.textContent.includes('Logic-level mismatch');i++)await pause(80);
       if(!document.querySelector('#linkList .linkAssessment')?.textContent.includes('BLOCKED'))
        throw Error('GUI did not render the blocking compatibility advisory');
+      // Check the actual packaged renderer and secured IPC default pin reference.
+      const pinReference=await api.referenceWorkspacePins(ws.id,planned.id,'source-controller');
+      if(pinReference.status!=='blocked'||pinReference.safeToWire!==false
+       ||pinReference.source?.pins?.tx!=='1'||pinReference.source?.pins?.rx!=='0'
+       ||pinReference.target?.pins?.tx!=='1'||pinReference.target?.pins?.rx!=='3')
+       throw Error('Actual saved Uno/ESP UART GPIO reference or voltage blocker was incorrect');
+      const pinButton=document.querySelector('#linkList [data-pin-reference="'+planned.id+'"]');
+      if(!pinButton)throw Error('Saved link lacks the pin reference control');
+      pinButton.click();
+      for(let i=0;i<40&&!document.querySelector('#linkList .linkPinReport')?.textContent.includes('TX: 1');i++)await pause(80);
+      const pinReport=document.querySelector('#linkList .linkPinReport')?.textContent||'';
+      if(!pinReport.includes('BLOCKED')||!pinReport.includes('Logic-level mismatch')||!pinReport.includes('RX: 0'))
+       throw Error('Packaged GUI did not render source-backed pin references with voltage warning');
       document.querySelector('#linkList [data-remove-workspace-link="'+planned.id+'"]').click();
       for(let i=0;i<30&&(await api.listWorkspaces()).find(w=>w.id===ws.id)?.links?.length;i++)await pause(80);
       if((await api.listWorkspaces()).find(w=>w.id===ws.id)?.links?.length)throw Error('Device link UI did not remove planned link');
@@ -213,7 +226,7 @@ app.whenReady().then(()=>{
       if(trace.outputs['13']!=='LOW'||trace.virtualTimeMs!==2000)throw Error('Simulator output mismatch');
       const resources=await api.resourceAnalyze(reopened,null,{intervalSeconds:10,bytesPerRecord:48,capacityBytes:1048576,retentionDays:7});
       if(resources.storage.recordsDay!==8640)throw Error('Resource advisor IPC mismatch');
-      return {passed:true,renderer:true,ipc:true,boardCatalog:true,newProjectUI:true,paletteDragDrop:true,inspectorEdit:true,persistence:true,generation:true,curatedWireGUI:true,workspaceTabUI:true,workspaceLinkUI:true,workspaceLinkAdvisorUI:true,sessionRestoreUI:true,typedVariableUI:true,analogThresholdFirmware:true,analogSimulation:true,reviewedEspGpioUI:true,typedDataLinkGUI:true,typedDataDragGUI:true,simulation:true,resources:true};
+      return {passed:true,renderer:true,ipc:true,boardCatalog:true,newProjectUI:true,paletteDragDrop:true,inspectorEdit:true,persistence:true,generation:true,curatedWireGUI:true,workspaceTabUI:true,workspaceLinkUI:true,workspaceLinkAdvisorUI:true,workspaceLinkPinUI:true,sessionRestoreUI:true,typedVariableUI:true,analogThresholdFirmware:true,analogSimulation:true,reviewedEspGpioUI:true,typedDataLinkGUI:true,typedDataDragGUI:true,simulation:true,resources:true};
     })()`);
    }catch(e){report={passed:false,error:String(e?.stack||e)};}
    try{fs.writeFileSync(process.env.BLAZE_MCU_SMOKE_FILE,JSON.stringify(report,null,2));}catch(e){console.error('SMOKE REPORT WRITE FAILED',e);}
