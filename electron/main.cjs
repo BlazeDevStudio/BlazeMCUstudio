@@ -235,6 +235,30 @@ app.whenReady().then(()=>{
       if(assigned?.source?.tx!=='17'||assigned?.source?.rx!=='16'||assigned?.target?.tx!=='1'||assigned?.target?.rx!=='3')
        throw Error('GUI did not persist correct GPIO selections');
       for(let i=0;i<30&&!document.querySelector('#linkList [data-clear-signal-plan="'+pair.id+'"]');i++)await pause(80);
+      // Recheck is read-only and must detect *later* firmware changes to saved plan pins.
+      const buttonRecheck=document.querySelector('#linkList [data-review-saved-pins="'+pair.id+'"]');
+      if(!buttonRecheck)throw Error('Saved signals lack a live recheck control');
+      const firstReview=await api.reviewWorkspacePins(ws.id,pair.id);
+      if(firstReview.status!=='review'||firstReview.safeToWire!==false)
+       throw Error('Saved pin plan did not give non-approved review status');
+      buttonRecheck.click();
+      for(let i=0;i<35&&!document.querySelector('#linkList .linkSavedPinReview')?.textContent.includes('REVIEW REQUIRED');i++)await pause(80);
+      if(!document.querySelector('#linkList .linkSavedPinReview')?.textContent.includes('no wiring'))
+       throw Error('Packaged GUI failed to label current selections as unapproved');
+      const changed=await api.openProject(other.id);
+      changed.peripherals=[{id:'lateClaim17',type:'gpio',bus:'test',pins:{io:'17'}}];
+      await api.saveProject(changed);
+      const stale=await api.reviewWorkspacePins(ws.id,pair.id);
+      if(stale.status!=='blocked'||!stale.errors.some(e=>e.includes('reserved by a project peripheral')))
+       throw Error('Later project pin reservation did not invalidate saved signal plan');
+      buttonRecheck.click();
+      for(let i=0;i<35&&!document.querySelector('#linkList .linkSavedPinReview')?.textContent.includes('BLOCKED');i++)await pause(80);
+      if(!document.querySelector('#linkList .linkSavedPinReview')?.textContent.includes('reserved by a project peripheral'))
+       throw Error('GUI did not visibly flag stale saved GPIO selections');
+      changed.peripherals=[];
+      await api.saveProject(changed);
+      if((await api.reviewWorkspacePins(ws.id,pair.id)).status!=='review')
+       throw Error('Removing stale project claim did not restore non-approved review');
       const clear=document.querySelector('#linkList [data-clear-signal-plan="'+pair.id+'"]');
       if(!clear)throw Error('Saved selections not shown as clearable planning metadata');
       clear.click();
@@ -272,7 +296,7 @@ app.whenReady().then(()=>{
       if(trace.outputs['13']!=='LOW'||trace.virtualTimeMs!==2000)throw Error('Simulator output mismatch');
       const resources=await api.resourceAnalyze(reopened,null,{intervalSeconds:10,bytesPerRecord:48,capacityBytes:1048576,retentionDays:7});
       if(resources.storage.recordsDay!==8640)throw Error('Resource advisor IPC mismatch');
-      return {passed:true,renderer:true,ipc:true,boardCatalog:true,newProjectUI:true,paletteDragDrop:true,inspectorEdit:true,persistence:true,generation:true,curatedWireGUI:true,workspaceTabUI:true,workspaceLinkUI:true,workspaceLinkAdvisorUI:true,workspaceLinkPinUI:true,workspaceSignalPlanUI:true,sessionRestoreUI:true,typedVariableUI:true,analogThresholdFirmware:true,analogSimulation:true,reviewedEspGpioUI:true,typedDataLinkGUI:true,typedDataDragGUI:true,simulation:true,resources:true};
+      return {passed:true,renderer:true,ipc:true,boardCatalog:true,newProjectUI:true,paletteDragDrop:true,inspectorEdit:true,persistence:true,generation:true,curatedWireGUI:true,workspaceTabUI:true,workspaceLinkUI:true,workspaceLinkAdvisorUI:true,workspaceLinkPinUI:true,workspaceSignalPlanUI:true,workspaceSignalReviewUI:true,sessionRestoreUI:true,typedVariableUI:true,analogThresholdFirmware:true,analogSimulation:true,reviewedEspGpioUI:true,typedDataLinkGUI:true,typedDataDragGUI:true,simulation:true,resources:true};
     })()`);
    }catch(e){report={passed:false,error:String(e?.stack||e)};}
    try{fs.writeFileSync(process.env.BLAZE_MCU_SMOKE_FILE,JSON.stringify(report,null,2));}catch(e){console.error('SMOKE REPORT WRITE FAILED',e);}
