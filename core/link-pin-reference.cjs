@@ -25,7 +25,14 @@ const REFS=Object.freeze({
  }
 });
 const WIRED=new Set(['uart','i2c','spi']);
-const PINS_OUT=new Set(['tx','sck','mosi','cs']);
+function drives(signal,role){
+ if(signal==='tx')return true;
+ if(signal==='rx')return false;
+ if(signal==='sda')return true;
+ if(signal==='scl'||signal==='sck'||signal==='mosi'||signal==='cs')return role==='controller';
+ if(signal==='miso')return role==='peripheral';
+ return false;
+}
 const CLAIM_TYPES=new Set(['pinMode','digitalWrite','pwmWrite','readAnalog','thresholdOutput']);
 function activePins(p){
  const pins=new Set();
@@ -63,7 +70,7 @@ function referencePins(from,to,kind,orientation='source-controller'){
   for(const [signal,pin] of Object.entries(pins)){
    if(!board.pins.includes(pin)&&!board.analog.includes(pin))errors.push(label+': '+signal+' pin '+pin+' is not in curated pinout');
    if(board.blocked.includes(pin))errors.push(label+': '+signal+' pin '+pin+' is reserved for flash');
-   if(board.inputOnly.includes(pin)&&PINS_OUT.has(signal))errors.push(label+': '+signal+' requires output but pin '+pin+' is input-only');
+   if(board.inputOnly.includes(pin)&&drives(signal,role))errors.push(label+': '+signal+' requires output but pin '+pin+' is input-only');
    if(used.has(pin))errors.push(label+': '+signal+' pin '+pin+' is already used by active firmware logic');
    if(peripheralPins.includes(pin))errors.push(label+': '+signal+' pin '+pin+' is assigned to an existing peripheral');
    if(board.bootSensitive.includes(pin))warnings.push(label+': '+signal+' GPIO '+pin+' is bootstrapping-sensitive; attached circuits can break boot');
