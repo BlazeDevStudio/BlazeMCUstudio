@@ -26,3 +26,7 @@ Known profile source links live in `core/board.cjs` (`sourceUrl` for each curate
 Unit tests exercise mismatched 5 V/3.3 V wiring, ESP same-voltage review-only paths, unsupported board variants, external-radio requirements, mixed-family ESP-NOW, custom/unknown paths, configured pin collisions, and manual code uncertainty. A separate test asserts that workspace assessment opens the *persisted project IDs* and blocks when a project has been trashed. The packaged Electron GUI smoke checks that a planned Uno↔ESP32 UART relation visibly reports a blocker, then removes that plan.
 
 Next admission: user-selected *real* physical pins and connector roles with verified board/carrier-specific provenance, transport-level implementation with independent compiler tests, and physical integration acceptance. No automatic hardware rewiring or code generation is enabled in this stage.
+
+## Pin reference display (v0.4.10)
+
+[PIN_REFERENCES.md](PIN_REFERENCES.md) contains the limited board/default pin table, curated source links and independent controller/peripheral role caveats. A pin reference is never a wiring certificate or generated firmware.
