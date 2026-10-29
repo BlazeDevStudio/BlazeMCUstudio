@@ -48,7 +48,9 @@ function renderWorkspaceLinks(){
  $('#linkList').innerHTML=(w.links||[]).length?w.links.map(l=>
   '<div class="workspaceLinkRow '+(l.available?'':'unavailable')+'"><strong>'+title(l.from)+' → '+title(l.to)+
   '</strong><small>'+escapeHTML(l.kind.toUpperCase())+' · '+(l.available?'Plan only, not connected':'Endpoint missing / recoverable')+
-  '</small><button data-remove-workspace-link="'+escapeHTML(l.id)+'" title="Delete planned relationship only">Remove plan</button></div>'
+  '</small><button data-assess-workspace-link="'+escapeHTML(l.id)+'" title="Check current boards and known limitations">Review compatibility</button>'+
+  '<button data-remove-workspace-link="'+escapeHTML(l.id)+'" title="Delete planned relationship only">Remove plan</button>'+
+  '<div class="linkAssessment" data-link-assessment="'+escapeHTML(l.id)+'" aria-live="polite"></div></div>'
  ).join(''):'<p class="hint">No planned relationships in this workspace.</p>';
 }
 function updateWorkspaceActions(){
@@ -343,6 +345,24 @@ $('#linkCreate').onclick=async()=>{
  }catch(e){log('Device plan rejected: '+e.message);}
 };
 $('#linkList').addEventListener('click',async e=>{
+ const check=e.target.closest('[data-assess-workspace-link]');
+ if(check&&currentWorkspaceId){
+  const workspaceId=currentWorkspaceId,linkId=check.dataset.assessWorkspaceLink;
+  const target=check.closest('.workspaceLinkRow')?.querySelector('[data-link-assessment]');
+  if(!target)return;
+  target.textContent='Checking saved board profiles…';
+  try{
+   const result=await window.blaze.assessWorkspaceLink(workspaceId,linkId);
+   if(currentWorkspaceId!==workspaceId||!target.isConnected)return;
+   const heading=result.status==='blocked'?'BLOCKED — not safe to wire':result.status==='unknown'?'UNKNOWN — verification required':'REVIEW REQUIRED — no wiring approval';
+   target.innerHTML='<strong>'+escapeHTML(heading)+'</strong>'+
+     [...(result.errors||[]).map(x=>'BLOCKER: '+x),...(result.warnings||[]).map(x=>'CHECK: '+x)]
+       .map(x=>'<p>'+escapeHTML(x)+'</p>').join('')+
+     '<small>No device communication firmware generated. Physical safety is unverified.</small>';
+   target.classList.toggle('blocked',result.status==='blocked');
+  }catch(err){if(target.isConnected)target.textContent='Cannot assess link: '+String(err.message||err);}
+  return;
+ }
  const button=e.target.closest('[data-remove-workspace-link]');
  if(!button||!currentWorkspaceId)return;
  const workspaceId=currentWorkspaceId;
