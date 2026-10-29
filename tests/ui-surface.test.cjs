@@ -16,3 +16,17 @@ test('desktop tab persistence is wired through secure IPC, restore path and UI h
  assert(app.includes('await persistSession();'));
  assert(electron.includes('sessionRestoreUI:true'));
 });
+
+test('workspace link planner is exposed in GUI, preload, IPC and packaged smoke',()=>{
+ const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
+ const app=fs.readFileSync(path.join(root,'app.js'),'utf8');
+ const preload=fs.readFileSync(path.join(__dirname,'../electron/preload.cjs'),'utf8');
+ const main=fs.readFileSync(path.join(__dirname,'../electron/main.cjs'),'utf8');
+ for(const id of ['workspaceLinksPanel','linkSource','linkTarget','linkKind','linkCreate','linkList'])
+  assert(html.includes('id="'+id+'"'),id);
+ for(const api of ['window.blaze.planWorkspaceLink','window.blaze.removeWorkspaceLink'])
+  assert(app.includes(api),api);
+ for(const channel of ["'workspace:link'","'workspace:unlink'"])
+  assert(preload.includes(channel)&&main.includes(channel),channel);
+ assert(main.includes('workspaceLinkUI:true'));
+});
