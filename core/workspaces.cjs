@@ -13,6 +13,16 @@ function checkName(name){
  if(typeof name!=='string'||!name.trim()||name.trim().length>80||/[\x00-\x1F]/.test(name))throw Error('Workspace name must be 1–80 printable characters');
  return name.trim();
 }
+// Other saved plans on the same physical project are inputs to review, never pin allocations.
+function claimedPins(workspace,excludedLinkId,projectId){
+ return (workspace.links||[]).flatMap(link=>{
+  if(link.id===excludedLinkId||!link.pins)return [];
+  return [
+   ...(link.from===projectId?Object.values(link.pins.source):[]),
+   ...(link.to===projectId?Object.values(link.pins.target):[])
+  ];
+ });
+}
 class WorkspaceCatalog {
  constructor(projectStore){
   if(!projectStore?.root||typeof projectStore.open!=='function')throw Error('Project store required');
@@ -88,7 +98,15 @@ class WorkspaceCatalog {
   catch{return {status:'blocked',safeToWire:false,firmwareGenerated:false,kind:link.kind,
    linkId:link.id,errors:['A project endpoint is unavailable, deleted or corrupt; recover or repair it before reassessment'],
    warnings:[],provenance:[]};}
-  return {...analyzeLink(source,target,link.kind),linkId:link.id};
+  const basic=analyzeLink(source,target,link.kind);
+  if(!link.pins)return {...basic,linkId:link.id};
+  const saved=this.reviewPins(id,linkId);
+  return {...basic,linkId:link.id,
+   status:saved.status==='blocked'?'blocked':basic.status,
+   savedPinsStatus:saved.status,
+   errors:[...new Set([...basic.errors,...saved.errors])],
+   warnings:[...new Set([...basic.warnings,...saved.warnings])]};
+
  }
  assignPins(id,linkId,input){
   if(!ID.test(String(linkId)))throw Error('Invalid planned link ID');
@@ -96,18 +114,30 @@ class WorkspaceCatalog {
    const link=(w.links||[]).find(l=>l.id===linkId);
    if(!link)throw Error('Planned link not found');
    const from=this.projects.open(link.from),to=this.projects.open(link.to);
-   const others=(w.links||[]).filter(l=>l.id!==linkId&&l.pins);
-   const claimed=projectId=>others.flatMap(l=>{
-    const source=l.from===projectId?Object.values(l.pins.source):[];
-    const target=l.to===projectId?Object.values(l.pins.target):[];
-    return [...source,...target];
-   });
    const checked=checkPins(from,to,link.kind,input,{
-    source:claimed(link.from),target:claimed(link.to)
+    source:claimedPins(w,linkId,link.from),target:claimedPins(w,linkId,link.to)
    });
    if(checked.errors.length)throw Error('Signal plan rejected: '+checked.errors.join('; '));
    link.pins=checked.pins; // independent metadata; no firmware project write.
   });
+ }
+ reviewPins(id,linkId){
+  if(!ID.test(String(linkId)))throw Error('Invalid planned link ID');
+  const workspace=this.get(id),link=workspace.links.find(l=>l.id===linkId);
+  if(!link)throw Error('Planned link not found');
+  if(!link.pins)return {linkId,kind:link.kind,assigned:false,status:'unassigned',
+   errors:[],warnings:['No saved signal selections to review'],safeToWire:false,firmwareGenerated:false};
+  let source,target;
+  try{source=this.projects.open(link.from);target=this.projects.open(link.to);}
+  catch{return {linkId,kind:link.kind,assigned:true,status:'blocked',
+   errors:['A saved signal endpoint is missing, in recovery, or has invalid project data'],
+   warnings:[],safeToWire:false,firmwareGenerated:false};}
+  const evaluated=checkPins(source,target,link.kind,link.pins,{
+   source:claimedPins(workspace,linkId,link.from),
+   target:claimedPins(workspace,linkId,link.to)
+  });
+  return {...evaluated,linkId,kind:link.kind,assigned:true,
+   sourceBoard:source.fqbn,targetBoard:target.fqbn};
  }
  clearPins(id,linkId){
   if(!ID.test(String(linkId)))throw Error('Invalid planned link ID');
