@@ -260,10 +260,16 @@ app.whenReady().then(()=>{
       const stale=await api.reviewWorkspacePins(ws.id,pair.id);
       if(stale.status!=='blocked'||!stale.errors.some(e=>e.includes('reserved by a project peripheral')))
        throw Error('Later project pin reservation did not invalidate saved signal plan');
-      buttonRecheck.click();
-      for(let i=0;i<35&&!document.querySelector('#linkList .linkSavedPinReview')?.textContent.includes('BLOCKED');i++)await pause(80);
-      if(!document.querySelector('#linkList .linkSavedPinReview')?.textContent.includes('reserved by a project peripheral'))
-       throw Error('GUI did not visibly flag stale saved GPIO selections');
+      let blockedShown=false,blockedText='';
+      for(let i=0;i<60;i++){
+       if(i===0||i===20||i===40)
+        document.querySelector('#linkList [data-review-saved-pins="'+pair.id+'"]')?.click();
+       blockedText=document.querySelector('#linkList [data-link-saved-review="'+pair.id+'"]')?.textContent||'';
+       if(blockedText.includes('BLOCKED')&&blockedText.includes('reserved by a project peripheral')){blockedShown=true;break;}
+       await pause(80);
+      }
+      if(!blockedShown)
+       throw Error('GUI did not visibly flag stale saved GPIO selections: '+blockedText.slice(0,240));
       changed.peripherals=[];
       await api.saveProject(changed);
       if((await api.reviewWorkspacePins(ws.id,pair.id)).status!=='review')
