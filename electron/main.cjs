@@ -222,6 +222,7 @@ app.whenReady().then(()=>{
  }
 
  register('session:load',()=>desktopSession.load());register('session:save',state=>desktopSession.save(state));
+ register('workspace:pinReference',(id,linkId,orientation)=>workspaceCatalog.pinReference(id,linkId,orientation));
  register('workspace:assess',(id,linkId)=>workspaceCatalog.assess(id,linkId));
  register('workspace:link',(id,from,to,kind)=>workspaceCatalog.link(id,from,to,kind));register('workspace:unlink',(id,linkId)=>workspaceCatalog.unlink(id,linkId));
  register('workspace:list',()=>workspaceCatalog.list());register('workspace:create',name=>workspaceCatalog.create(name));register('workspace:rename',(id,name)=>workspaceCatalog.rename(id,name));register('workspace:add',(id,pid)=>workspaceCatalog.add(id,pid));register('workspace:remove',(id,pid)=>workspaceCatalog.remove(id,pid));register('workspace:delete',id=>workspaceCatalog.delete(id));register('project:list',()=>store.list());register('project:create',(name,fqbn,template)=>store.create(name,fqbn,template));register('project:open',id=>store.open(id));register('project:save',p=>store.save(p));
