@@ -16,3 +16,10 @@ A feature is **not implemented** until its acceptance evidence exists. No future
 **Cross-cutting requirements:** project CRUD + templates/recent/workspaces/ZIP/snapshots; offline library platform installation from cached packages; peripherals ADC/DAC/I²C/SPI/UART/I²S/SDMMC; safe shared-resource identification; full Monaco-like code tooling; WYSIWYG state, groups and remote security; original assets/fonts; serial monitor and debugger; asset deduplication; filesystem rollover and power loss; multi-device workspace targets, firmware stability and reliable source maps. These remain explicit backlog items, not silently dropped.
 
 **Preview constraints:** currently one project active at a time, basic listing and create/open/save/snapshots/export; no delete, rename, ZIP or crash-journal replay GUI; generated-only pin profiles have only Uno R3 partial trusted mapping. Do not treat graph checks as complete resource collision proof.
+
+## v0.4.13 UART lab stage — source + independent real compilers
+
+- Inert PING/PONG C++11 framing/CRC-8/250ms bounded parser is implemented in `core/firmware/BlazeUartFrame.h`.
+- `scripts/export-uart-lab.cjs` creates genuine separate ESP32 UART1 initiator and ESP8266 UART0 responder Arduino sketch directories, with header local to each.
+- Real host native C++ sanitizer tests and two pinned ESP core Arduino compilations are mandatory CI; standalone demo sketches intentionally do not alter user project firmware or physical hardware.
+- **Not** an integrated workspace-linked UART driver, verified voltage/connector wiring, physical transfer test, secure communication channel, or production release. See [UART_FRAME_LAB.md](UART_FRAME_LAB.md).
