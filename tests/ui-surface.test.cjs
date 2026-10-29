@@ -53,3 +53,15 @@ test('saved board-pin references run through explicit IPC and can render in pack
  assert(preload.includes("referenceWorkspacePins:'workspace:pinReference'"));
  assert(main.includes('workspaceLinkPinUI:true'));
 });
+
+test('user-selected signal mapping uses bounded IPC with explicit save/clear and packaged GUI gate',()=>{
+ const main=fs.readFileSync(path.join(__dirname,'../electron/main.cjs'),'utf8');
+ const preload=fs.readFileSync(path.join(__dirname,'../electron/preload.cjs'),'utf8');
+ const source=fs.readFileSync(path.join(root,'app.js'),'utf8');
+ for(const channel of ["'workspace:assignPins'","'workspace:clearPins'"]){
+  assert(main.includes(channel));assert(preload.includes(channel));
+ }
+ for(const name of ['window.blaze.assignWorkspacePins','window.blaze.clearWorkspacePins',
+ 'data-edit-signal-plan','data-save-signal-plan','data-clear-signal-plan'])assert(source.includes(name),name);
+ assert(main.includes('workspaceSignalPlanUI:true'));
+});
