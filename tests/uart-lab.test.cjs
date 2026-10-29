@@ -31,6 +31,6 @@ test('UART lab exports two real Arduino sketches and local identical protocol he
   assert(initiator.includes('Serial1.begin(9600,SERIAL_8N1,16,17)'));
   assert(responder.includes('Serial.begin(9600)'));
   assert(responder.includes('makePong(request,response)'));
-  assert.throws(()=>execFileSync(process.execPath,[script,root],{stdio:'pipe'}),/exited with code/);
+  assert.throws(()=>execFileSync(process.execPath,[script,root],{stdio:'pipe'}),e=>e.status!==0&&String(e.stderr).includes('Refusing to overwrite'));
  }finally{fs.rmSync(root,{recursive:true,force:true});}
 });
