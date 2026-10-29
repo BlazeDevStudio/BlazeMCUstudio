@@ -6,6 +6,7 @@ const path=require('node:path');
 const {randomUUID}=require('node:crypto');
 const {analyzeLink}=require('./link-advisor.cjs');
 const {referencePins}=require('./link-pin-reference.cjs');
+const {parseShape,checkPins}=require('./link-signal-plan.cjs');
 const LINK_KINDS=new Set(['uart','i2c','spi','wifi','esp-now','custom']);
 const ID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function checkName(name){
@@ -36,6 +37,7 @@ class WorkspaceCatalog {
      ||link.from===link.to||!LINK_KINDS.has(link.kind)
      ||typeof link.createdAt!=='string'||!/^\d{4}-\d{2}-\d{2}T/.test(link.createdAt))
       throw Error('Invalid workspace link');
+    if(link.pins!==undefined)parseShape(link.kind,link.pins);
     const key=link.kind+'|'+link.from+'|'+link.to;
     if(unique.has(key))throw Error('Duplicate workspace link');
     linkIds.add(link.id);unique.add(key);
@@ -87,6 +89,33 @@ class WorkspaceCatalog {
    linkId:link.id,errors:['A project endpoint is unavailable, deleted or corrupt; recover or repair it before reassessment'],
    warnings:[],provenance:[]};}
   return {...analyzeLink(source,target,link.kind),linkId:link.id};
+ }
+ assignPins(id,linkId,input){
+  if(!ID.test(String(linkId)))throw Error('Invalid planned link ID');
+  return this.edit(id,w=>{
+   const link=(w.links||[]).find(l=>l.id===linkId);
+   if(!link)throw Error('Planned link not found');
+   const from=this.projects.open(link.from),to=this.projects.open(link.to);
+   const others=(w.links||[]).filter(l=>l.id!==linkId&&l.pins);
+   const claimed=projectId=>others.flatMap(l=>{
+    const source=l.from===projectId?Object.values(l.pins.source):[];
+    const target=l.to===projectId?Object.values(l.pins.target):[];
+    return [...source,...target];
+   });
+   const checked=checkPins(from,to,link.kind,input,{
+    source:claimed(link.from),target:claimed(link.to)
+   });
+   if(checked.errors.length)throw Error('Signal plan rejected: '+checked.errors.join('; '));
+   link.pins=checked.pins; // independent metadata; no firmware project write.
+  });
+ }
+ clearPins(id,linkId){
+  if(!ID.test(String(linkId)))throw Error('Invalid planned link ID');
+  return this.edit(id,w=>{
+   const link=(w.links||[]).find(l=>l.id===linkId);
+   if(!link)throw Error('Planned link not found');
+   delete link.pins;
+  });
  }
  pinReference(id,linkId,orientation='source-controller'){
   if(!ID.test(String(linkId)))throw Error('Invalid planned link ID');
