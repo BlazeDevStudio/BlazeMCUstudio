@@ -235,6 +235,8 @@ app.whenReady().then(()=>{
  }
 
  register('session:load',()=>desktopSession.load());register('session:save',state=>desktopSession.save(state));
+ register('workspace:assignPins',(id,linkId,input)=>workspaceCatalog.assignPins(id,linkId,input));
+ register('workspace:clearPins',(id,linkId)=>workspaceCatalog.clearPins(id,linkId));
  register('workspace:pinReference',(id,linkId,orientation)=>workspaceCatalog.pinReference(id,linkId,orientation));
  register('workspace:assess',(id,linkId)=>workspaceCatalog.assess(id,linkId));
  register('workspace:link',(id,from,to,kind)=>workspaceCatalog.link(id,from,to,kind));register('workspace:unlink',(id,linkId)=>workspaceCatalog.unlink(id,linkId));
