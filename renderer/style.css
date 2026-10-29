@@ -46,3 +46,13 @@
 .linkAssessment p{margin:5px 0;color:var(--muted)}
 .linkAssessment.blocked{border-left:3px solid var(--danger);padding-left:8px}
 .linkAssessment.blocked strong{color:var(--danger)}
+
+/* Reference pin guidance is never a hardware/wiring approval. */
+.workspaceLinkRow label{display:flex;align-items:center;gap:6px;margin:7px 0;font-size:11px}
+.workspaceLinkRow label select{min-width:0;max-width:115px;margin:0;padding:4px 6px}
+.linkPinReport{padding:7px 3px;font-size:11px;line-height:1.5;overflow-wrap:anywhere;color:var(--muted)}
+.linkPinReport strong{display:block;color:var(--warn)}
+.linkPinReport p{margin:5px 0}
+.linkPinReport p small{display:block;padding-left:7px}
+.linkPinReport.blocked{border-left:3px solid var(--danger);padding-left:7px}
+.linkPinReport.blocked strong,.linkPinReport p.pinError{color:var(--danger)}
