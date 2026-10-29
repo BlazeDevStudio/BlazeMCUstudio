@@ -5,6 +5,7 @@ const fs=require('node:fs');
 const path=require('node:path');
 const {randomUUID}=require('node:crypto');
 const {analyzeLink}=require('./link-advisor.cjs');
+const {referencePins}=require('./link-pin-reference.cjs');
 const LINK_KINDS=new Set(['uart','i2c','spi','wifi','esp-now','custom']);
 const ID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function checkName(name){
@@ -86,6 +87,17 @@ class WorkspaceCatalog {
    linkId:link.id,errors:['A project endpoint is unavailable, deleted or corrupt; recover or repair it before reassessment'],
    warnings:[],provenance:[]};}
   return {...analyzeLink(source,target,link.kind),linkId:link.id};
+ }
+ pinReference(id,linkId,orientation='source-controller'){
+  if(!ID.test(String(linkId)))throw Error('Invalid planned link ID');
+  const w=this.get(id),link=w.links.find(x=>x.id===linkId);
+  if(!link)throw Error('Planned link not found');
+  let from,to;
+  try{from=this.projects.open(link.from);to=this.projects.open(link.to);}
+  catch{return {status:'blocked',safeToWire:false,firmwareGenerated:false,source:null,target:null,
+    linkId,kind:link.kind,orientation,errors:['A project endpoint is unavailable or corrupt'],
+    warnings:['No physical pin reference can be provided for missing firmware targets']};}
+  return {...referencePins(from,to,link.kind,orientation),linkId};
  }
  unlink(id,linkId){
   if(!ID.test(String(linkId)))throw Error('Invalid link ID');
