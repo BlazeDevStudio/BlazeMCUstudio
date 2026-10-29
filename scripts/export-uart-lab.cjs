@@ -16,7 +16,7 @@ using namespace BlazeUart;
 static Parser receiver;
 static uint32_t lastSent=0;
 static uint8_t nextSequence=0;
-static volatile uint32_t pongCount=0;
+static uint32_t pongCount=0;
 static uint8_t pending=0;
 static bool pendingValid=false;
 void setup(){
@@ -55,7 +55,7 @@ void loop(){
 // This is not a GPIO/relay/financial or authenticated command receiver.
 using namespace BlazeUart;
 static Parser receiver;
-static volatile uint32_t replied=0;
+static uint32_t replied=0;
 void setup(){Serial.begin(9600);}
 void loop(){
  receiver.expire(millis());
