@@ -243,7 +243,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          g++ --version | head -1
+          g++ --version
           g++ -std=c++11 -O1 -g -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -fno-omit-frame-pointer tests/native/uart-frame-test.cpp -o "$RUNNER_TEMP/blaze-uart-native"
           "$RUNNER_TEMP/blaze-uart-native" 2>&1 | tee "$RUNNER_TEMP/uart-native-test.log"
       - name: Install pinned Arduino CLI 1.5.1
