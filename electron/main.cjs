@@ -162,6 +162,22 @@ app.whenReady().then(()=>{
       for(let i=0;i<30&&document.getElementById('projectTitle').textContent!=='GuiSmoke';i++)await pause(80);
       if(document.getElementById('projectTitle').textContent!=='GuiSmoke')throw Error('Project tab switching failed');
       if((await api.openProject(saved.id)).fqbn!=='arduino:avr:uno'||(await api.openProject(other.id)).fqbn!=='esp32:esp32:esp32')throw Error('Workspace leaked board identity');
+      // Real DOM planner exercise across two distinct firmware targets.
+      const linkSource=document.getElementById('linkSource'),linkTarget=document.getElementById('linkTarget');
+      if(document.getElementById('workspaceLinksPanel').classList.contains('hidden')
+       ||!Array.from(linkSource.options).some(o=>o.value===saved.id)
+       ||!Array.from(linkTarget.options).some(o=>o.value===other.id))throw Error('Workspace link planner did not render both members');
+      linkSource.value=saved.id;linkTarget.value=other.id;
+      document.getElementById('linkKind').value='uart';
+      document.getElementById('linkCreate').click();
+      for(let i=0;i<30&&!(await api.listWorkspaces()).find(w=>w.id===ws.id)?.links?.length;i++)await pause(80);
+      const planned=(await api.listWorkspaces()).find(w=>w.id===ws.id)?.links?.[0];
+      if(planned?.from!==saved.id||planned?.to!==other.id||planned?.kind!=='uart'
+       ||!document.querySelector('#linkList [data-remove-workspace-link="'+planned.id+'"]'))
+       throw Error('Device link UI did not create and render a persisted UART plan');
+      document.querySelector('#linkList [data-remove-workspace-link="'+planned.id+'"]').click();
+      for(let i=0;i<30&&(await api.listWorkspaces()).find(w=>w.id===ws.id)?.links?.length;i++)await pause(80);
+      if((await api.listWorkspaces()).find(w=>w.id===ws.id)?.links?.length)throw Error('Device link UI did not remove planned link');
       document.getElementById('workspaceRemoveCurrent').click();await pause(350);
       if((await api.listWorkspaces()).find(w=>w.id===ws.id)?.projectIds.includes(saved.id))throw Error('UI unlink did not persist');
       await api.deleteWorkspace(ws.id);
@@ -186,7 +202,7 @@ app.whenReady().then(()=>{
       if(trace.outputs['13']!=='LOW'||trace.virtualTimeMs!==2000)throw Error('Simulator output mismatch');
       const resources=await api.resourceAnalyze(reopened,null,{intervalSeconds:10,bytesPerRecord:48,capacityBytes:1048576,retentionDays:7});
       if(resources.storage.recordsDay!==8640)throw Error('Resource advisor IPC mismatch');
-      return {passed:true,renderer:true,ipc:true,boardCatalog:true,newProjectUI:true,paletteDragDrop:true,inspectorEdit:true,persistence:true,generation:true,curatedWireGUI:true,workspaceTabUI:true,sessionRestoreUI:true,typedVariableUI:true,analogThresholdFirmware:true,analogSimulation:true,reviewedEspGpioUI:true,typedDataLinkGUI:true,typedDataDragGUI:true,simulation:true,resources:true};
+      return {passed:true,renderer:true,ipc:true,boardCatalog:true,newProjectUI:true,paletteDragDrop:true,inspectorEdit:true,persistence:true,generation:true,curatedWireGUI:true,workspaceTabUI:true,workspaceLinkUI:true,sessionRestoreUI:true,typedVariableUI:true,analogThresholdFirmware:true,analogSimulation:true,reviewedEspGpioUI:true,typedDataLinkGUI:true,typedDataDragGUI:true,simulation:true,resources:true};
     })()`);
    }catch(e){report={passed:false,error:String(e?.stack||e)};}
    try{fs.writeFileSync(process.env.BLAZE_MCU_SMOKE_FILE,JSON.stringify(report,null,2));}catch(e){console.error('SMOKE REPORT WRITE FAILED',e);}
