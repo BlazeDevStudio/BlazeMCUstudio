@@ -242,9 +242,18 @@ app.whenReady().then(()=>{
       if(firstReview.status!=='review'||firstReview.safeToWire!==false)
        throw Error('Saved pin plan did not give non-approved review status');
       buttonRecheck.click();
-      for(let i=0;i<35&&!document.querySelector('#linkList .linkSavedPinReview')?.textContent.includes('REVIEW REQUIRED');i++)await pause(80);
-      if(!document.querySelector('#linkList .linkSavedPinReview')?.textContent.includes('no wiring'))
-       throw Error('Packaged GUI failed to label current selections as unapproved');
+      // Refreshing the workspace intentionally resets any previous advisory to "not rechecked".
+      // Observe the complete result atomically; retry the visible control if that refresh
+      // replaces the report node before the IPC response has been rendered.
+      let confirmedReview=false,reviewText='';
+      for(let i=0;i<55;i++){
+       reviewText=document.querySelector('#linkList [data-link-saved-review="'+pair.id+'"]')?.textContent||'';
+       if(reviewText.includes('REVIEW REQUIRED')&&reviewText.includes('no wiring')){confirmedReview=true;break;}
+       if(i===20||i===40)document.querySelector('#linkList [data-review-saved-pins="'+pair.id+'"]')?.click();
+       await pause(80);
+      }
+      if(!confirmedReview)
+       throw Error('Packaged GUI failed to label current selections as unapproved: '+reviewText.slice(0,240));
       const changed=await api.openProject(other.id);
       changed.peripherals=[{id:'lateClaim17',type:'gpio',bus:'test',pins:{io:'17'}}];
       await api.saveProject(changed);
