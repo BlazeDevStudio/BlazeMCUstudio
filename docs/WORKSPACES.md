@@ -23,3 +23,7 @@ Next admission gate: compatibility-aware source/target role selection, voltage/I
 ## v0.4.9 compatibility review (non-electrical)
 
 Each persisted plan has a **Review compatibility** action. The read-only assessment resolves saved firmware projects and reports BLOCKED, REVIEW REQUIRED or UNKNOWN. Mismatched direct signal logic levels between Uno 5 V and ESP 3.3 V are blocked; no board pair is declared wired/working. The original topology and firmware remain unchanged. See [BOARD_COMPATIBILITY.md](BOARD_COMPATIBILITY.md).
+
+## Default signal references (v0.4.10)
+
+The **Pin reference** action on each saved plan opens the endpoint projects and displays documented UART, I²C or SPI GPIO defaults, proposed bus-controller direction, active firmware/peripheral pin collisions and known boot/voltage blockers. These are transient display recommendations, not saved pin allocations. No carrier-specific wiring or firmware is generated. See [PIN_REFERENCES.md](PIN_REFERENCES.md).
