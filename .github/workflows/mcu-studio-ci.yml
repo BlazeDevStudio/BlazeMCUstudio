@@ -169,11 +169,11 @@ jobs:
         run: |
           $base='${{ steps.locate.outputs.studio_dir }}'
           $items=@("$base/core","$base/renderer","$base/electron","$base/docs","$base/tests","$base/scripts","$base/examples","$base/package.json","$base/README.md",".github/workflows/mcu-studio-ci.yml")
-          Compress-Archive -Path $items -DestinationPath "$env:RUNNER_TEMP/blaze-mcu-v0412-source.zip" -Force
+          Compress-Archive -Path $items -DestinationPath "$env:RUNNER_TEMP/blaze-mcu-v0413-source.zip" -Force
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: blaze-mcu-v0412-session-build-evidence
+          name: blaze-mcu-v0413-session-build-evidence
           path: |
             ${{ steps.locate.outputs.studio_dir }}/dist/*.exe
             ${{ runner.temp }}/arduino-compile.log
@@ -187,7 +187,7 @@ jobs:
             ${{ runner.temp }}/arduino-install.log
             ${{ runner.temp }}/sha256.txt
             ${{ runner.temp }}/blaze-mcu-gui-smoke.json
-            ${{ runner.temp }}/blaze-mcu-v0412-source.zip
+            ${{ runner.temp }}/blaze-mcu-v0413-source.zip
           if-no-files-found: warn
           retention-days: 14
 
@@ -203,11 +203,13 @@ jobs:
             platform: esp8266:esp8266@3.1.2
             fqbn: esp8266:esp8266:generic
             sketch: BlazeESP8266Blink
+            uartSketch: BlazeUartEsp8266Responder
             index: https://arduino.esp8266.com/stable/package_esp8266com_index.json
           - family: esp32
             platform: esp32:esp32@3.0.7
             fqbn: esp32:esp32:esp32
             sketch: BlazeESP32Blink
+            uartSketch: BlazeUartEsp32Initiator
             index: https://espressif.github.io/arduino-esp32/package_esp32_index.json
     steps:
       - uses: actions/checkout@v4
@@ -236,6 +238,14 @@ jobs:
           node --test tests/esp-pin-profiles.test.cjs
           mkdir -p "$RUNNER_TEMP/esp-generated"
           node scripts/export-esp.cjs "$RUNNER_TEMP/esp-generated" | tee "$RUNNER_TEMP/generated-esp-manifest.txt"
+      - name: Execute source-linked C++ UART protocol tests (host, sanitizers)
+        working-directory: ${{ steps.locate.outputs.studio_dir }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          g++ --version | head -1
+          g++ -std=c++11 -O1 -g -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -fno-omit-frame-pointer tests/native/uart-frame-test.cpp -o "$RUNNER_TEMP/blaze-uart-native"
+          "$RUNNER_TEMP/blaze-uart-native" 2>&1 | tee "$RUNNER_TEMP/uart-native-test.log"
       - name: Install pinned Arduino CLI 1.5.1
         shell: bash
         run: |
@@ -250,6 +260,7 @@ jobs:
           PLATFORM: ${{ matrix.platform }}
           FQBN: ${{ matrix.fqbn }}
           SKETCH: ${{ matrix.sketch }}
+          UART_SKETCH: ${{ matrix.uartSketch }}
           INDEX: ${{ matrix.index }}
         run: |
           set -euo pipefail
@@ -258,10 +269,12 @@ jobs:
           arduino-cli core install "$PLATFORM" --additional-urls "$INDEX" 2>&1 | tee "$RUNNER_TEMP/esp-core-install.log"
           arduino-cli core list --json | tee "$RUNNER_TEMP/esp-core-versions.json"
           arduino-cli compile --fqbn "$FQBN" --additional-urls "$INDEX" --warnings all "$RUNNER_TEMP/esp-generated/$SKETCH" 2>&1 | tee "$RUNNER_TEMP/esp-compile.log"
+          node scripts/export-uart-lab.cjs "$RUNNER_TEMP/esp-generated" | tee "$RUNNER_TEMP/uart-export-manifest.txt"
+          arduino-cli compile --fqbn "$FQBN" --additional-urls "$INDEX" --warnings all "$RUNNER_TEMP/esp-generated/$UART_SKETCH" 2>&1 | tee "$RUNNER_TEMP/uart-compile.log"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: blaze-mcu-v0412-${{ matrix.family }}-compile-evidence
+          name: blaze-mcu-v0413-${{ matrix.family }}-compile-evidence
           path: |
             ${{ runner.temp }}/cli-version.txt
             ${{ runner.temp }}/generated-esp-manifest.txt
@@ -269,5 +282,8 @@ jobs:
             ${{ runner.temp }}/esp-core-install.log
             ${{ runner.temp }}/esp-core-versions.json
             ${{ runner.temp }}/esp-compile.log
+            ${{ runner.temp }}/uart-compile.log
+            ${{ runner.temp }}/uart-export-manifest.txt
+            ${{ runner.temp }}/uart-native-test.log
           if-no-files-found: warn
           retention-days: 14
