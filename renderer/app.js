@@ -32,12 +32,32 @@ async function refreshWorkspaces(){
  $('#workspaceSelect').value=currentWorkspaceId;
  updateWorkspaceActions();
 }
+function renderWorkspaceLinks(){
+ const panel=$('#workspaceLinksPanel'),w=workspaces.find(x=>x.id===currentWorkspaceId);
+ panel.classList.toggle('hidden',!w);
+ if(!w){$('#linkList').innerHTML='';$('#linkCreate').disabled=true;return;}
+ const members=projects.filter(p=>w.projectIds.includes(p.id));
+ const opts=members.map(p=>'<option value="'+escapeHTML(p.id)+'">'+escapeHTML(p.name)+' · '+escapeHTML(p.fqbn)+'</option>').join('');
+ const src=$('#linkSource').value,dst=$('#linkTarget').value;
+ $('#linkSource').innerHTML=opts;$('#linkTarget').innerHTML=opts;
+ if(members.some(p=>p.id===src))$('#linkSource').value=src;
+ if(members.some(p=>p.id===dst))$('#linkTarget').value=dst;
+ else if(members.length>1)$('#linkTarget').value=members.find(p=>p.id!==$('#linkSource').value).id;
+ $('#linkCreate').disabled=members.length<2;
+ const title=id=>{const p=projects.find(x=>x.id===id);return p?escapeHTML(p.name):'Missing/recoverable ('+escapeHTML(String(id).slice(0,8))+')';};
+ $('#linkList').innerHTML=(w.links||[]).length?w.links.map(l=>
+  '<div class="workspaceLinkRow '+(l.available?'':'unavailable')+'"><strong>'+title(l.from)+' → '+title(l.to)+
+  '</strong><small>'+escapeHTML(l.kind.toUpperCase())+' · '+(l.available?'Plan only, not connected':'Endpoint missing / recoverable')+
+  '</small><button data-remove-workspace-link="'+escapeHTML(l.id)+'" title="Delete planned relationship only">Remove plan</button></div>'
+ ).join(''):'<p class="hint">No planned relationships in this workspace.</p>';
+}
 function updateWorkspaceActions(){
  const w=workspaces.find(w=>w.id===currentWorkspaceId);
  for(const id of ['workspaceRename','workspaceDelete','workspaceAddCurrent','workspaceRemoveCurrent'])$('#'+id).disabled=!w;
  $('#workspaceAddCurrent').disabled=!w||!project||w.projectIds.includes(project.id);
  $('#workspaceRemoveCurrent').disabled=!w||!project||!w.projectIds.includes(project.id);
- $('#workspaceSummary').textContent=w?`${w.projectIds.length} independent targets${w.missingIds?.length?' · '+w.missingIds.length+' recoverable/missing':''}. Export/compile each separately.`:'Showing all projects. Each tab builds its own board target.';
+ $('#workspaceSummary').textContent=w?`${w.projectIds.length} independent targets · ${(w.links||[]).length} planned links${w.missingIds?.length?' · '+w.missingIds.length+' recoverable/missing':''}. Export/compile separately.`:'Showing all projects. Each tab builds its own board target.';
+ renderWorkspaceLinks();
 }
 // Tabs and selected collection live in a separate atomic session file, never in firmware.
 async function persistSession(){
@@ -312,6 +332,24 @@ $('#workspaceRemoveCurrent').onclick=async()=>{
  if(!currentWorkspaceId||!project)return;
  try{await window.blaze.removeFromWorkspace(currentWorkspaceId,project.id);await refreshWorkspaces();await refreshProjects();log('Unlinked project; firmware remains accessible in All projects.');}catch(e){log('Workspace unlink failed: '+e.message);}
 };
+// Planning-only device relationships remain outside every firmware generator.
+$('#linkCreate').onclick=async()=>{
+ const workspaceId=currentWorkspaceId,from=$('#linkSource').value,to=$('#linkTarget').value,kind=$('#linkKind').value;
+ if(!workspaceId||!from||!to||from===to){log('Select two different member projects for a planned link.');return;}
+ try{
+  await window.blaze.planWorkspaceLink(workspaceId,from,to,kind);
+  await refreshWorkspaces();await refreshProjects(false);
+  log('Saved '+kind.toUpperCase()+' device relationship (plan only). No communication firmware or electrical wiring generated.');
+ }catch(e){log('Device plan rejected: '+e.message);}
+};
+$('#linkList').addEventListener('click',async e=>{
+ const button=e.target.closest('[data-remove-workspace-link]');
+ if(!button||!currentWorkspaceId)return;
+ const workspaceId=currentWorkspaceId;
+ try{await window.blaze.removeWorkspaceLink(workspaceId,button.dataset.removeWorkspaceLink);
+  await refreshWorkspaces();await refreshProjects(false);log('Removed planned device relationship only.');
+ }catch(err){log('Remove link failed: '+err.message);}
+});
 $('#openProjectTabs').addEventListener('click',async e=>{
  const close=e.target.closest('[data-close-project]');
  if(close){
