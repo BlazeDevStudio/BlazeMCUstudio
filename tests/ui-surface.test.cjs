@@ -41,3 +41,15 @@ test('workspace board advisor uses saved link identity through scoped read-only 
  assert(preload.includes("assessWorkspaceLink:'workspace:assess'"));
  assert(electron.includes('workspaceLinkAdvisorUI:true'));
 });
+
+test('saved board-pin references run through explicit IPC and can render in packaged GUI',()=>{
+ const app=fs.readFileSync(path.join(root,'app.js'),'utf8');
+ const main=fs.readFileSync(path.join(__dirname,'../electron/main.cjs'),'utf8');
+ const preload=fs.readFileSync(path.join(__dirname,'../electron/preload.cjs'),'utf8');
+ assert(app.includes('data-pin-reference'));
+ assert(app.includes('data-pin-orientation'));
+ assert(app.includes('window.blaze.referenceWorkspacePins(workspaceId,linkId,orientation)'));
+ assert(main.includes("'workspace:pinReference'"));
+ assert(preload.includes("referenceWorkspacePins:'workspace:pinReference'"));
+ assert(main.includes('workspaceLinkPinUI:true'));
+});
