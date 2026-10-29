@@ -4,6 +4,7 @@
 const fs=require('node:fs');
 const path=require('node:path');
 const {randomUUID}=require('node:crypto');
+const LINK_KINDS=new Set(['uart','i2c','spi','wifi','esp-now','custom']);
 const ID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function checkName(name){
  if(typeof name!=='string'||!name.trim()||name.trim().length>80||/[\x00-\x1F]/.test(name))throw Error('Workspace name must be 1–80 printable characters');
@@ -22,6 +23,21 @@ class WorkspaceCatalog {
   const ids=new Set();
   for(const x of data.items){
    if(!ID.test(x?.id||'')||ids.has(x.id)||checkName(x.name)!==x.name||!Array.isArray(x.projectIds)||x.projectIds.length>100||new Set(x.projectIds).size!==x.projectIds.length||x.projectIds.some(id=>!ID.test(id)))throw Error('Invalid workspace catalog entry');
+   const links=x.links===undefined?[]:x.links;
+   if(!Array.isArray(links)||links.length>100)throw Error('Invalid workspace links');
+   const linkIds=new Set(),unique=new Set();
+   for(const link of links){
+    if(!link||typeof link!=='object'||Array.isArray(link)
+     ||typeof link.id!=='string'||!ID.test(link.id)||linkIds.has(link.id)
+     ||typeof link.from!=='string'||!x.projectIds.includes(link.from)
+     ||typeof link.to!=='string'||!x.projectIds.includes(link.to)
+     ||link.from===link.to||!LINK_KINDS.has(link.kind)
+     ||typeof link.createdAt!=='string'||!/^\d{4}-\d{2}-\d{2}T/.test(link.createdAt))
+      throw Error('Invalid workspace link');
+    const key=link.kind+'|'+link.from+'|'+link.to;
+    if(unique.has(key))throw Error('Duplicate workspace link');
+    linkIds.add(link.id);unique.add(key);
+   }
    ids.add(x.id);
   }
   return data;
@@ -33,13 +49,40 @@ class WorkspaceCatalog {
    fs.renameSync(tmp,this.filename);
   }finally{if(fs.existsSync(tmp))fs.rmSync(tmp);}
  }
- list(){return this.read().items.map(x=>({...x,projectIds:[...x.projectIds],missingIds:x.projectIds.filter(id=>{try{this.projects.open(id);return false;}catch{return true;}})}));}
+ list(){return this.read().items.map(x=>{
+  const missingIds=x.projectIds.filter(id=>{try{this.projects.open(id);return false;}catch{return true;}});
+  const missing=new Set(missingIds);
+  return {...x,projectIds:[...x.projectIds],missingIds,links:(x.links||[]).map(l=>({...l,available:!missing.has(l.from)&&!missing.has(l.to)}))};
+ });}
  get(id){if(!ID.test(String(id)))throw Error('Invalid workspace ID');const workspace=this.list().find(x=>x.id===id);if(!workspace)throw Error('Workspace not found');return workspace;}
- create(name){const entry={id:randomUUID(),name:checkName(name),projectIds:[],createdAt:new Date().toISOString()};const data=this.read();if(data.items.length>=100)throw Error('Workspace limit reached');data.items.push(entry);this.write(data);return structuredClone(entry);}
+ create(name){const entry={id:randomUUID(),name:checkName(name),projectIds:[],links:[],createdAt:new Date().toISOString()};const data=this.read();if(data.items.length>=100)throw Error('Workspace limit reached');data.items.push(entry);this.write(data);return structuredClone(entry);}
  rename(id,name){return this.edit(id,x=>{x.name=checkName(name);});}
  add(id,projectId){if(!ID.test(String(projectId)))throw Error('Invalid project ID');this.projects.open(projectId);return this.edit(id,x=>{if(!x.projectIds.includes(projectId)){if(x.projectIds.length>=100)throw Error('Workspace project limit reached');x.projectIds.push(projectId);}});}
- remove(id,projectId){if(!ID.test(String(projectId)))throw Error('Invalid project ID');return this.edit(id,x=>{x.projectIds=x.projectIds.filter(p=>p!==projectId);});}
+ remove(id,projectId){if(!ID.test(String(projectId)))throw Error('Invalid project ID');return this.edit(id,x=>{
+  x.projectIds=x.projectIds.filter(p=>p!==projectId);
+  // Unlinking membership must not leave topology edges referencing nonmembers.
+  x.links=(x.links||[]).filter(l=>l.from!==projectId&&l.to!==projectId);
+ });}
+ link(id,from,to,kind){
+  if(!ID.test(String(from))||!ID.test(String(to))||from===to||!LINK_KINDS.has(kind))throw Error('Invalid planned device link');
+  this.projects.open(from);this.projects.open(to);
+  return this.edit(id,x=>{
+   if(!x.projectIds.includes(from)||!x.projectIds.includes(to))throw Error('Both devices must be in this workspace');
+   const links=x.links||[];
+   if(links.some(l=>l.from===from&&l.to===to&&l.kind===kind))throw Error('Planned device link already exists');
+   if(links.length>=100)throw Error('Workspace link limit reached');
+   links.push({id:randomUUID(),from,to,kind,createdAt:new Date().toISOString()});
+   x.links=links;
+  });
+ }
+ unlink(id,linkId){
+  if(!ID.test(String(linkId)))throw Error('Invalid link ID');
+  return this.edit(id,x=>{
+   if(!(x.links||[]).some(l=>l.id===linkId))throw Error('Planned link not found');
+   x.links=x.links.filter(l=>l.id!==linkId);
+  });
+ }
  delete(id){if(!ID.test(String(id)))throw Error('Invalid workspace ID');const data=this.read();const n=data.items.findIndex(x=>x.id===id);if(n<0)throw Error('Workspace not found');const [old]=data.items.splice(n,1);this.write(data);return {id:old.id,removedAssociationCount:old.projectIds.length,projectsDeleted:0};}
- edit(id,change){if(!ID.test(String(id)))throw Error('Invalid workspace ID');const data=this.read();const x=data.items.find(w=>w.id===id);if(!x)throw Error('Workspace not found');change(x);this.write(data);return {...x,projectIds:[...x.projectIds]};}
+ edit(id,change){if(!ID.test(String(id)))throw Error('Invalid workspace ID');const data=this.read();const x=data.items.find(w=>w.id===id);if(!x)throw Error('Workspace not found');change(x);this.write(data);return {...x,projectIds:[...x.projectIds],links:(x.links||[]).map(l=>({...l}))};}
 }
 module.exports={WorkspaceCatalog,checkName};
