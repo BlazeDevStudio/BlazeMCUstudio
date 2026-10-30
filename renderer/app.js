@@ -372,6 +372,7 @@ $('#linkList').addEventListener('click',async e=>{
    if(workspaceId!==currentWorkspaceId||!region.isConnected)return;
    region.innerHTML='<strong>'+escapeHTML(result.eligible?
     'LAB EXPORT ELIGIBLE — no wiring approval':'EXPORT BLOCKED')+'</strong>'+
+    (result.variant?'<p>Compiled lab pairing: '+escapeHTML(result.variant)+'</p>':'')+
     (result.issues||[]).map(i=>'<p>'+escapeHTML(i)+'</p>').join('')+
     (result.warnings||[]).map(i=>'<p>'+escapeHTML(i)+'</p>').join('')+
     (result.eligible?'<button data-export-uart-pair="'+escapeHTML(linkId)+'">Choose folder and export lab sketches…</button>':'');
