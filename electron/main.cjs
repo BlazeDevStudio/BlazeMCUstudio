@@ -305,6 +305,35 @@ app.whenReady().then(()=>{
       for(let i=0;i<35&&(await api.listWorkspaces()).find(w=>w.id===ws.id)?.links?.some(l=>l.id===pair.id);i++)await pause(80);
       if((await api.listWorkspaces()).find(w=>w.id===ws.id)?.links?.some(l=>l.id===pair.id))
        throw Error('Positive plan cleanup failed');
+      // Second compiled target: two classic ESP32 boards, UART1 on both ends.
+      const second32=await api.createProject('SecondESP32','esp32:esp32:esp32');
+      await api.addToWorkspace(ws.id,second32.id);
+      const dualLink=await api.planWorkspaceLink(ws.id,other.id,second32.id,'uart');
+      const dual=dualLink.links.find(l=>l.from===other.id&&l.to===second32.id);
+      if(!dual)throw Error('Could not create second ESP32 pair');
+      await api.assignWorkspacePins(ws.id,dual.id,{
+       orientation:'source-controller',source:{tx:'17',rx:'16'},target:{tx:'25',rx:'26'}
+      });
+      const dualReview=await api.previewWorkspaceUart(ws.id,dual.id);
+      if(!dualReview.eligible||dualReview.variant!=='dual-esp32-uart1'||dualReview.wireApproval!==false)
+       throw Error('Saved dual ESP32 GPIO route was not accepted as lab-only export');
+      await refreshWorkspaces();await refreshProjects(false);
+      const dualButton=document.querySelector('#linkList [data-preview-uart-lab="'+dual.id+'"]');
+      if(!dualButton)throw Error('Dual ESP32 source does not have lab export preview in GUI');
+      dualButton.click();
+      let visibleDual=false,dualText='';
+      for(let i=0;i<50;i++){
+       dualText=document.querySelector('#linkList [data-uart-preview="'+dual.id+'"]')?.textContent||'';
+       if(dualText.includes('dual-esp32-uart1')&&dualText.includes('LAB EXPORT ELIGIBLE')
+        &&document.querySelector('#linkList [data-export-uart-pair="'+dual.id+'"]')){visibleDual=true;break;}
+       if(i===20)document.querySelector('#linkList [data-preview-uart-lab="'+dual.id+'"]')?.click();
+       await pause(80);
+      }
+      if(!visibleDual)throw Error('Packaged GUI did not expose dual ESP32 lab export variant: '+dualText.slice(0,220));
+      document.querySelector('#linkList [data-remove-workspace-link="'+dual.id+'"]').click();
+      for(let i=0;i<35&&(await api.listWorkspaces()).find(w=>w.id===ws.id)?.links?.some(l=>l.id===dual.id);i++)await pause(80);
+      if((await api.listWorkspaces()).find(w=>w.id===ws.id)?.links?.some(l=>l.id===dual.id))
+       throw Error('Dual ESP32 lab planned link cleanup failed');
       document.querySelector('#linkList [data-remove-workspace-link="'+planned.id+'"]').click();
       for(let i=0;i<30&&(await api.listWorkspaces()).find(w=>w.id===ws.id)?.links?.length;i++)await pause(80);
       if((await api.listWorkspaces()).find(w=>w.id===ws.id)?.links?.length)throw Error('Device link UI did not remove planned link');
@@ -332,7 +361,7 @@ app.whenReady().then(()=>{
       if(trace.outputs['13']!=='LOW'||trace.virtualTimeMs!==2000)throw Error('Simulator output mismatch');
       const resources=await api.resourceAnalyze(reopened,null,{intervalSeconds:10,bytesPerRecord:48,capacityBytes:1048576,retentionDays:7});
       if(resources.storage.recordsDay!==8640)throw Error('Resource advisor IPC mismatch');
-      return {passed:true,renderer:true,ipc:true,boardCatalog:true,newProjectUI:true,paletteDragDrop:true,inspectorEdit:true,persistence:true,generation:true,curatedWireGUI:true,workspaceTabUI:true,workspaceLinkUI:true,workspaceLinkAdvisorUI:true,workspaceLinkPinUI:true,workspaceSignalPlanUI:true,workspaceSignalReviewUI:true,workspaceUartExportUI:true,sessionRestoreUI:true,typedVariableUI:true,analogThresholdFirmware:true,analogSimulation:true,reviewedEspGpioUI:true,typedDataLinkGUI:true,typedDataDragGUI:true,simulation:true,resources:true};
+      return {passed:true,renderer:true,ipc:true,boardCatalog:true,newProjectUI:true,paletteDragDrop:true,inspectorEdit:true,persistence:true,generation:true,curatedWireGUI:true,workspaceTabUI:true,workspaceLinkUI:true,workspaceLinkAdvisorUI:true,workspaceLinkPinUI:true,workspaceSignalPlanUI:true,workspaceSignalReviewUI:true,workspaceUartExportUI:true,workspaceDualEsp32UARTUI:true,sessionRestoreUI:true,typedVariableUI:true,analogThresholdFirmware:true,analogSimulation:true,reviewedEspGpioUI:true,typedDataLinkGUI:true,typedDataDragGUI:true,simulation:true,resources:true};
     })()`);
    }catch(e){report={passed:false,error:String(e?.stack||e)};}
    try{fs.writeFileSync(process.env.BLAZE_MCU_SMOKE_FILE,JSON.stringify(report,null,2));}catch(e){console.error('SMOKE REPORT WRITE FAILED',e);}
