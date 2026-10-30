@@ -72,3 +72,10 @@
 .linkSavedPinReview p{margin:5px 0}
 .linkSavedPinReview.blocked{border-left:3px solid var(--danger);padding-left:8px}
 .linkSavedPinReview.blocked strong,.linkSavedPinReview .pinError{color:var(--danger)}
+
+/* Explicit UART lab export is a separate preview, never a physical wiring approval. */
+.linkUartPreview{margin:6px 2px;padding:8px 5px;font-size:11px;color:var(--muted);overflow-wrap:anywhere}
+.linkUartPreview strong{display:block;color:var(--warn)}
+.linkUartPreview p{margin:5px 0}
+.linkUartPreview.blocked{border-left:3px solid var(--danger);padding-left:8px}
+.linkUartPreview.blocked strong{color:var(--danger)}
