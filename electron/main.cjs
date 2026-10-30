@@ -320,6 +320,17 @@ app.whenReady().then(()=>{
  }
 
  register('session:load',()=>desktopSession.load());register('session:save',state=>desktopSession.save(state));
+ register('workspace:previewUartExport',(id,linkId)=>uartWorkspaceExport.inspect(workspaceCatalog,id,linkId));
+ register('workspace:exportUartPair',async(id,linkId)=>{
+  // Only the privileged main process may select a destination path. Revalidate BEFORE
+  // and AFTER the user-selected folder dialog; never accept arbitrary renderer paths.
+  const preview=uartWorkspaceExport.inspect(workspaceCatalog,id,linkId);
+  if(!preview.eligible)throw Error('UART lab export blocked: '+preview.issues.join('; '));
+  const result=await dialog.showOpenDialog(win,{properties:['openDirectory','createDirectory'],
+   title:'Choose parent folder for NEW unflashed UART lab sketches'});
+  if(result.canceled||!result.filePaths?.length)return {canceled:true};
+  return uartWorkspaceExport.exportPair(workspaceCatalog,id,linkId,result.filePaths[0]);
+ });
  register('workspace:reviewPins',(id,linkId)=>workspaceCatalog.reviewPins(id,linkId));
  register('workspace:assignPins',(id,linkId,input)=>workspaceCatalog.assignPins(id,linkId,input));
  register('workspace:clearPins',(id,linkId)=>workspaceCatalog.clearPins(id,linkId));
