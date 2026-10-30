@@ -23,3 +23,7 @@ A feature is **not implemented** until its acceptance evidence exists. No future
 - `scripts/export-uart-lab.cjs` creates genuine separate ESP32 UART1 initiator and ESP8266 UART0 responder Arduino sketch directories, with header local to each.
 - Real host native C++ sanitizer tests and two pinned ESP core Arduino compilations are mandatory CI; standalone demo sketches intentionally do not alter user project firmware or physical hardware.
 - **Not** an integrated workspace-linked UART driver, verified voltage/connector wiring, physical transfer test, secure communication channel, or production release. See [UART_FRAME_LAB.md](UART_FRAME_LAB.md).
+
+## v0.4.14 — explicit guarded UART workspace lab export
+
+A saved, freshly rechecked workspace UART link matching **ESP32 classic UART1 TX17/RX16 → ESP8266 Generic UART0 TX1/RX3** can be exported as two separate PING/PONG lab Arduino sketches using an explicit native folder selector. A reusable shared template preserves the v0.4.13 independently compiled firmware source. Node regression covers source nonmutation, exact manifest, stale/unsupported maps, collisions and no overwrite. Packaged Windows GUI smoke must show the true guarded export preview. No flashing, physical validation or signed release. See [UART_FRAME_LAB.md](UART_FRAME_LAB.md).
