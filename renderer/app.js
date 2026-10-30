@@ -59,6 +59,9 @@ function renderWorkspaceLinks(){
    (l.pins?'<small>Saved selections (NOT connected): '+['source','target'].map(side=>
      side+': '+Object.entries(l.pins[side]).map(([key,pin])=>escapeHTML(key.toUpperCase()+': '+pin)).join(', ')).join(' · ')+'</small>':'')
    :'')+
+  (l.kind==='uart'&&l.pins?
+   '<button data-preview-uart-lab="'+escapeHTML(l.id)+'" title="Review eligibility before selecting output folder">UART lab export…</button>'+
+   '<div class="linkUartPreview" data-uart-preview="'+escapeHTML(l.id)+'" aria-live="polite"></div>':'')+
   '<button data-pin-reference="'+escapeHTML(l.id)+'" title="View reference pins only, no wiring approval">Pin reference</button>'+
   '<div class="linkPinReport" data-link-pin-report="'+escapeHTML(l.id)+'" aria-live="polite"></div>'+
   '<button data-assess-workspace-link="'+escapeHTML(l.id)+'" title="Check current boards and known limitations">Review compatibility</button>'+
@@ -358,6 +361,38 @@ $('#linkCreate').onclick=async()=>{
  }catch(e){log('Device plan rejected: '+e.message);}
 };
 $('#linkList').addEventListener('click',async e=>{
+ const uartPreview=e.target.closest('[data-preview-uart-lab]');
+ if(uartPreview&&currentWorkspaceId){
+  const workspaceId=currentWorkspaceId,linkId=uartPreview.dataset.previewUartLab;
+  const region=uartPreview.closest('.workspaceLinkRow')?.querySelector('[data-uart-preview]');
+  if(!region)return;
+  region.textContent='Validating current saved UART link…';
+  try{
+   const result=await window.blaze.previewWorkspaceUart(workspaceId,linkId);
+   if(workspaceId!==currentWorkspaceId||!region.isConnected)return;
+   region.innerHTML='<strong>'+escapeHTML(result.eligible?
+    'LAB EXPORT ELIGIBLE — no wiring approval':'EXPORT BLOCKED')+'</strong>'+
+    (result.issues||[]).map(i=>'<p>'+escapeHTML(i)+'</p>').join('')+
+    (result.warnings||[]).map(i=>'<p>'+escapeHTML(i)+'</p>').join('')+
+    (result.eligible?'<button data-export-uart-pair="'+escapeHTML(linkId)+'">Choose folder and export lab sketches…</button>':'');
+   region.classList.toggle('blocked',!result.eligible);
+  }catch(err){if(region.isConnected)region.textContent='Cannot review UART export: '+String(err.message||err);}
+  return;
+ }
+ const exportButton=e.target.closest('[data-export-uart-pair]');
+ if(exportButton&&currentWorkspaceId){
+  const workspaceId=currentWorkspaceId,linkId=exportButton.dataset.exportUartPair;
+  const region=exportButton.closest('[data-uart-preview]');
+  exportButton.disabled=true;
+  try{
+   const result=await window.blaze.exportWorkspaceUart(workspaceId,linkId);
+   if(workspaceId!==currentWorkspaceId||!region?.isConnected)return;
+   region.textContent=result.canceled?'Export cancelled; no files created.':
+    'Lab sketches exported to '+result.folder+'. Original firmware unchanged. Not flashed or electrically verified.';
+  }catch(err){if(region?.isConnected)region.textContent='Export refused: '+String(err.message||err);}
+  finally{if(exportButton.isConnected)exportButton.disabled=false;}
+  return;
+ }
  const review=e.target.closest('[data-review-saved-pins]');
  if(review&&currentWorkspaceId){
   const workspaceId=currentWorkspaceId,linkId=review.dataset.reviewSavedPins;
