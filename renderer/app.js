@@ -360,40 +360,52 @@ $('#linkCreate').onclick=async()=>{
   log('Saved '+kind.toUpperCase()+' device relationship (plan only). No communication firmware or electrical wiring generated.');
  }catch(e){log('Device plan rejected: '+e.message);}
 };
+// UART export is an explicit, separate lab-only workflow. Keep preview and
+// native folder selection separate from generic workspace pin editing.
+async function previewUartLab(button){
+ const workspaceId=currentWorkspaceId,linkId=button.dataset.previewUartLab;
+ if(!workspaceId)return;
+ const region=button.closest('.workspaceLinkRow')?.querySelector('[data-uart-preview]');
+ if(!region)return;
+ region.textContent='Validating current saved UART link…';
+ try{
+  const review=await window.blaze.previewWorkspaceUart(workspaceId,linkId);
+  if(workspaceId!==currentWorkspaceId||!region.isConnected)return;
+  region.innerHTML='<strong>'+escapeHTML(review.eligible?
+   'LAB EXPORT ELIGIBLE — no wiring approval':'EXPORT BLOCKED')+'</strong>'+
+   (review.variant?'<p>Compiled lab pairing: '+escapeHTML(review.variant)+'</p>':'')+
+   (review.issues||[]).map(issue=>'<p>'+escapeHTML(issue)+'</p>').join('')+
+   (review.warnings||[]).map(warning=>'<p>'+escapeHTML(warning)+'</p>').join('')+
+   (review.eligible?
+    '<button data-export-uart-pair="'+escapeHTML(linkId)+'">Choose folder and export lab sketches…</button>':'');
+  region.classList.toggle('blocked',!review.eligible);
+ }catch(error){
+  if(region.isConnected)region.textContent='Cannot review UART export: '+String(error.message||error);
+ }
+}
+
+async function exportUartLab(button){
+ const workspaceId=currentWorkspaceId,linkId=button.dataset.exportUartPair;
+ if(!workspaceId)return;
+ const region=button.closest('[data-uart-preview]');
+ button.disabled=true;
+ try{
+  const result=await window.blaze.exportWorkspaceUart(workspaceId,linkId);
+  if(workspaceId!==currentWorkspaceId||!region?.isConnected)return;
+  region.textContent=result.canceled?'Export cancelled; no files created.':
+   'Lab sketches exported to '+result.folder+'. Original firmware unchanged. Not flashed or electrically verified.';
+ }catch(error){
+  if(region?.isConnected)region.textContent='Export refused: '+String(error.message||error);
+ }finally{
+  if(button.isConnected)button.disabled=false;
+ }
+}
+
 $('#linkList').addEventListener('click',async e=>{
- const uartPreview=e.target.closest('[data-preview-uart-lab]');
- if(uartPreview&&currentWorkspaceId){
-  const workspaceId=currentWorkspaceId,linkId=uartPreview.dataset.previewUartLab;
-  const region=uartPreview.closest('.workspaceLinkRow')?.querySelector('[data-uart-preview]');
-  if(!region)return;
-  region.textContent='Validating current saved UART link…';
-  try{
-   const result=await window.blaze.previewWorkspaceUart(workspaceId,linkId);
-   if(workspaceId!==currentWorkspaceId||!region.isConnected)return;
-   region.innerHTML='<strong>'+escapeHTML(result.eligible?
-    'LAB EXPORT ELIGIBLE — no wiring approval':'EXPORT BLOCKED')+'</strong>'+
-    (result.variant?'<p>Compiled lab pairing: '+escapeHTML(result.variant)+'</p>':'')+
-    (result.issues||[]).map(i=>'<p>'+escapeHTML(i)+'</p>').join('')+
-    (result.warnings||[]).map(i=>'<p>'+escapeHTML(i)+'</p>').join('')+
-    (result.eligible?'<button data-export-uart-pair="'+escapeHTML(linkId)+'">Choose folder and export lab sketches…</button>':'');
-   region.classList.toggle('blocked',!result.eligible);
-  }catch(err){if(region.isConnected)region.textContent='Cannot review UART export: '+String(err.message||err);}
-  return;
- }
+ const preview=e.target.closest('[data-preview-uart-lab]');
+ if(preview){await previewUartLab(preview);return;}
  const exportButton=e.target.closest('[data-export-uart-pair]');
- if(exportButton&&currentWorkspaceId){
-  const workspaceId=currentWorkspaceId,linkId=exportButton.dataset.exportUartPair;
-  const region=exportButton.closest('[data-uart-preview]');
-  exportButton.disabled=true;
-  try{
-   const result=await window.blaze.exportWorkspaceUart(workspaceId,linkId);
-   if(workspaceId!==currentWorkspaceId||!region?.isConnected)return;
-   region.textContent=result.canceled?'Export cancelled; no files created.':
-    'Lab sketches exported to '+result.folder+'. Original firmware unchanged. Not flashed or electrically verified.';
-  }catch(err){if(region?.isConnected)region.textContent='Export refused: '+String(err.message||err);}
-  finally{if(exportButton.isConnected)exportButton.disabled=false;}
-  return;
- }
+ if(exportButton){await exportUartLab(exportButton);return;}
  const review=e.target.closest('[data-review-saved-pins]');
  if(review&&currentWorkspaceId){
   const workspaceId=currentWorkspaceId,linkId=review.dataset.reviewSavedPins;
