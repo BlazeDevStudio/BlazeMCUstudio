@@ -57,3 +57,20 @@ The desktop **UART lab export…** action appears only when a saved workspace UA
 The reviewed preview then displays **Choose folder and export lab sketches…**. A platform-native folder picker accepts a *parent directory*. The export rechecks everything after that picker before creating one new `BlazeUartLab-<link id prefix>` directory. It writes two independent `.ino` sketches from the exact same shared lab templates that CI compiles, with a local copy of the tested header in each folder, `manifest.json` tying the source and target workspace IDs and GPIO selections to the lab, and `READ_ME_FIRST.txt`. An existing output directory is never overwritten; partial temporary staging is cleaned. Project firmware files, stored workspace metadata, board configuration, physical hardware, payment/relay controls, and compile/flash processes are **not modified or invoked**.
 
 **Important:** `eligible` / `status:review` means only that the software export's narrow preconditions are met. It does not mean safe electrical wiring, working UART traffic, provisioned security, validated harness layout, or permission to flash. No physical UART transfer has been witnessed. More board types and arbitrary pin mapping remain unsupported rather than borrowing unverified routing.
+
+## Second curated board pairing — v0.4.15
+
+The **classic ESP32 ↔ classic ESP32** pair is now independently compiled in the same UART lab workflow, without touching ordinary project code or permitting physical wiring. The exact reviewed saved configuration is:
+
+| Endpoint | Arduino core target | Peripheral | Raw GPIO TX | Raw GPIO RX |
+|---|---|---|---:|---:|
+| Source | `esp32:esp32:esp32` | UART1 `Serial1` | 17 | 16 |
+| Target | `esp32:esp32:esp32` | UART1 `Serial1` | 25 | 26 |
+
+The existing **ESP32 UART1 → ESP8266 UART0** pair remains unchanged. Both pairing variants share the **identical C++ frame parser**, ESP32 PING initiator and inert `makePong` handler. A separate `BlazeUartEsp32Responder` implements UART1 PONG on RX26/TX25; only the ESP32-specific job builds this new source using pinned ESP32 Arduino core 3.0.7.
+
+The desktop preview explicitly reports `dual-esp32-uart1` or `esp32-to-esp8266`. The exporter reopens the saved workspace project identities and checks existing graph/peripheral ownership and mutually-exclusive GPIO allocations immediately prior to writing. Wrong pin numbers are **rejected** rather than automatically substituted in the generated firmware. It writes either a separate ESP32/ESP32 pair or ESP32/ESP8266 pair, never both into an ambiguous folder.
+
+**Native simulated link acceptance:** `tests/native/uart-pair-host-test.cpp` compiles the actual `BlazeUartFrame.h` and feeds two parser instances through a deterministic in-memory byte stream. It tests multiple cycles including sequence rollover, marker bytes within payloads, CRC-corrupted packets, dropped incomplete frames, timeout recovery, and refusal to reply to non-PING packets. This is **not a real COM-port, device-to-device, logic-analyzer, USB bridge or UART electrical test**.
+
+Espressif's [ESP32-DevKitC documentation](https://docs.espressif.com/projects/esp-dev-kits/en/latest/esp32/esp32-devkitc/user_guide.html) lists GPIO25/26 as header I/O and GPIO16/17 as available only on compatible module variants (e.g. WROOM rather than WROVER). Selecting the generic classic ESP32 Arduino FQBN does **not** establish which physical module is mounted or whether the carrier exposes or reserves those pins. Therefore both examples remain **development lab-only / not approved to wire or flash**. No payment, relay or actuator operations are permitted; CRC-8 is detection, not security.
