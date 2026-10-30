@@ -52,7 +52,7 @@ function inspect(catalog,workspaceId,linkId){
   if(source.source?.mode!=='visual'||target.source?.mode!=='visual')
    issues.push('Manual firmware projects are not eligible for this separate lab export');
   if(pair&&(!matches(link.pins?.source,pair.source)||!matches(link.pins?.target,pair.target)))
-   issues.push('This lab only supports source ESP32 UART1 TX17/RX16 and the compiled target UART pin route ('+pair.serial+')');
+   issues.push('This lab only supports ESP32 UART1 source TX17/RX16 and the compiled target UART pin route ('+pair.serial+')');
  }
  const details={
   workspaceId,linkId,sourceProjectId:link.from,targetProjectId:link.to,
