@@ -4,7 +4,10 @@
 // not interpolated from untrusted workspace metadata. No GPIO or control commands.
 const ESP32='esp32:esp32:esp32';
 const ESP8266='esp8266:esp8266:generic';
-const initiatorDefinition=['BlazeUartEsp32Initiator','esp32:esp32:esp32',`
+const esp32Initiator=Object.freeze({
+ name:'BlazeUartEsp32Initiator',
+ fqbn:ESP32,
+ source:`
 #include "BlazeUartFrame.h"
 // ESP32 Dev Module LAB ONLY: Serial1 UART1, RX GPIO16 / TX GPIO17.
 // No power/level-shifter/harness approval; firmware sends only inert PING.
@@ -43,10 +46,7 @@ void loop(){
   lastSent=now;
  }
 }
-`];
-const esp32Initiator=Object.freeze({
- name:initiatorDefinition[0],fqbn:initiatorDefinition[1],
- source:initiatorDefinition[2].trimStart()
+`.trimStart()
 });
 
 // Both PONG responders share the same reviewed C++ implementation. Only the
