@@ -69,4 +69,36 @@ void loop(){
 }
 `]
 ];
-module.exports={demos:Object.freeze(demos.map(([name,fqbn,ino])=>Object.freeze({name,fqbn,source:ino.trimStart()})))};
+// A second, independent ESP32 UART1 responder. TX25/RX26 are curated classic
+// DevKitC GPIOs and are NOT a claim of safe carrier wiring or any WROVER layout.
+const esp32Responder=Object.freeze({
+ name:'BlazeUartEsp32Responder',fqbn:'esp32:esp32:esp32',
+ source:`#include "BlazeUartFrame.h"
+// Classic ESP32 LAB ONLY: Serial1 UART1, RX GPIO26 / TX GPIO25.
+// No wire harness, power, signal integrity or bus authorization is implied.
+using namespace BlazeUart;
+static Parser receiver;
+static uint32_t replyCount=0;
+void setup(){Serial1.begin(9600,SERIAL_8N1,26,25);}
+void loop(){
+ receiver.expire(millis());
+ for(uint8_t i=0;i<32&&Serial1.available()>0;++i){
+  const int incoming=Serial1.read();
+  if(incoming<0)break;
+  Frame request;
+  if(receiver.feed(static_cast<uint8_t>(incoming),millis(),request)){
+   Frame answer;
+   if(makePong(request,answer)){
+    uint8_t bytes[MAX_FRAME];
+    const size_t n=encode(answer,bytes,sizeof(bytes));
+    if(n){Serial1.write(bytes,n);++replyCount;}
+   }
+  }
+ }
+}
+`
+});
+module.exports={
+ demos:Object.freeze(demos.map(([name,fqbn,ino])=>Object.freeze({name,fqbn,source:ino.trimStart()}))),
+ esp32Responder
+};
