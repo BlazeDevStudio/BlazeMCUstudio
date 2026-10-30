@@ -45,3 +45,15 @@ The source module declares a deterministic frame layout:
 Real electrical wiring, GND continuity, actual connector breakout, TX-to-RX crossover, power regulation, UART USB converter/programming contention, level shifting, board variants and voltage/current are **unverified**. The ESP8266 UART0 may be shared with USB programming and debug hardware; while the classic ESP32 UART1 permits mapped RX16/TX17 in this example, carrier/PSRAM restrictions still require external review. Compilation does **not** prove UART transfer, frame latency, electrical safety, data integrity in noise, peer pairing, replay protection, authentication, encryption, or readiness for coin/relay control.
 
 **No flashing, no payment or relay functions, no production signing or release.** The module must remain isolated from financial admission/control paths and is not automatically connected to the workspace planner. A future separate milestone can add user-controlled export of compatible project-specific pair sketches after pin and UART-peripheral ownership validation; real wire acceptance remains NO-GO until independent physical bench evidence.
+
+## Saved workspace export — v0.4.14
+
+The desktop **UART lab export…** action appears only when a saved workspace UART relationship has explicit signal selections. It calls a read-only source/target project recheck. Only one narrowly compiled topology is currently accepted:
+
+- **Source:** classic ESP32 `esp32:esp32:esp32`, UART1 TX GPIO17, RX GPIO16 (project uses visual source ownership).
+- **Target:** generic ESP8266 `esp8266:esp8266:generic`, UART0 TX GPIO1, RX GPIO3 (project uses visual source ownership).
+- The projects must be separate, saved workspace members, and the existing firmware pin and peripheral collision tests must still pass. Any known voltage conflict, moved pin, unsupported board, manual source, or competing workspace GPIO claim blocks export.
+
+The reviewed preview then displays **Choose folder and export lab sketches…**. A platform-native folder picker accepts a *parent directory*. The export rechecks everything after that picker before creating one new `BlazeUartLab-<link id prefix>` directory. It writes two independent `.ino` sketches from the exact same shared lab templates that CI compiles, with a local copy of the tested header in each folder, `manifest.json` tying the source and target workspace IDs and GPIO selections to the lab, and `READ_ME_FIRST.txt`. An existing output directory is never overwritten; partial temporary staging is cleaned. Project firmware files, stored workspace metadata, board configuration, physical hardware, payment/relay controls, and compile/flash processes are **not modified or invoked**.
+
+**Important:** `eligible` / `status:review` means only that the software export's narrow preconditions are met. It does not mean safe electrical wiring, working UART traffic, provisioned security, validated harness layout, or permission to flash. No physical UART transfer has been witnessed. More board types and arbitrary pin mapping remain unsupported rather than borrowing unverified routing.

@@ -77,3 +77,18 @@ test('current saved signal review IPC and visible stale-config recheck are requi
  assert(app.includes('not rechecked against current firmware'));
  assert(main.includes('workspaceSignalReviewUI:true'));
 });
+
+test('bounded workspace UART export uses privileged chosen folder and source-linked GUI preview',()=>{
+ const main=fs.readFileSync(path.join(__dirname,'../electron/main.cjs'),'utf8');
+ const preload=fs.readFileSync(path.join(__dirname,'../electron/preload.cjs'),'utf8');
+ const app=fs.readFileSync(path.join(root,'app.js'),'utf8');
+ for(const channel of ["'workspace:previewUartExport'","'workspace:exportUartPair'"]){
+  assert(main.includes(channel));assert(preload.includes(channel));
+ }
+ assert(main.includes('uartWorkspaceExport.exportPair(workspaceCatalog,id,linkId,result.filePaths[0])'));
+ assert(main.includes('dialog.showOpenDialog(win'));
+ assert(!app.includes('result.filePaths[0]'));
+ for(const control of ['data-preview-uart-lab','data-export-uart-pair','window.blaze.previewWorkspaceUart','window.blaze.exportWorkspaceUart'])
+  assert(app.includes(control),control);
+ assert(main.includes('workspaceUartExportUI:true'));
+});

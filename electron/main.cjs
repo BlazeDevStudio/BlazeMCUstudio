@@ -1,6 +1,6 @@
 'use strict';
 const {app,BrowserWindow,ipcMain,dialog,session}=require('electron');const path=require('node:path');
-const {WorkspaceStore}=require('../core/storage.cjs');const {WorkspaceCatalog}=require('../core/workspaces.cjs');const {DesktopSession}=require('../core/desktop-session.cjs');const arduino=require('../core/arduino.cjs');const {analyzeGraph,generateSketch}=require('../core/project.cjs');const balie=require('../core/balie.cjs');const board=require('../core/board.cjs');const flow=require('../core/flowchart.cjs');const {SimulationController}=require('../core/simulator.cjs');const resources=require('../core/resources.cjs');const peripheralPlanner=require('../core/peripherals.cjs');
+const {WorkspaceStore}=require('../core/storage.cjs');const uartWorkspaceExport=require('../core/uart-workspace-export.cjs');const {WorkspaceCatalog}=require('../core/workspaces.cjs');const {DesktopSession}=require('../core/desktop-session.cjs');const arduino=require('../core/arduino.cjs');const {analyzeGraph,generateSketch}=require('../core/project.cjs');const balie=require('../core/balie.cjs');const board=require('../core/board.cjs');const flow=require('../core/flowchart.cjs');const {SimulationController}=require('../core/simulator.cjs');const resources=require('../core/resources.cjs');const peripheralPlanner=require('../core/peripherals.cjs');
 let win,store,cli,workspaceCatalog,desktopSession;const simulations=new SimulationController();
 function checkedSender(event){if(!win || event.sender!==win.webContents)throw Error('Untrusted IPC sender');}
 function register(channel,fn){ipcMain.handle(channel,(event,...args)=>{checkedSender(event);return fn(...args);});}
@@ -234,6 +234,27 @@ app.whenReady().then(()=>{
       const assigned=(await api.listWorkspaces()).find(w=>w.id===ws.id)?.links?.find(l=>l.id===pair.id)?.pins;
       if(assigned?.source?.tx!=='17'||assigned?.source?.rx!=='16'||assigned?.target?.tx!=='1'||assigned?.target?.rx!=='3')
        throw Error('GUI did not persist correct GPIO selections');
+      // The packaged GUI must preview a REAL persisted, re-reviewed UART pair.
+      const noMap=await api.previewWorkspaceUart(ws.id,planned.id);
+      if(noMap.eligible||!noMap.issues.some(x=>x.includes('Save an explicit')))
+       throw Error('UART exporter preview accepted unassigned mixed-voltage source');
+      const eligible=await api.previewWorkspaceUart(ws.id,pair.id);
+      if(!eligible.eligible||eligible.wireApproval!==false||eligible.sourceFqbn!=='esp32:esp32:esp32'
+       ||eligible.targetFqbn!=='esp8266:esp8266:generic')
+       throw Error('Valid ESP32/ESP8266 saved link not eligible for inert lab export');
+      let previewRendered=false,previewText='';
+      for(let i=0;i<60;i++){
+       if(i===0||i===20||i===40)
+        document.querySelector('#linkList [data-preview-uart-lab="'+pair.id+'"]')?.click();
+       previewText=document.querySelector('#linkList [data-uart-preview="'+pair.id+'"]')?.textContent||'';
+       if(previewText.includes('LAB EXPORT ELIGIBLE')&&previewText.includes('no wiring approval')
+        &&document.querySelector('#linkList [data-export-uart-pair="'+pair.id+'"]')){previewRendered=true;break;}
+       await pause(80);
+      }
+      if(!previewRendered)throw Error('Packaged GUI did not render reviewed UART lab export control: '+previewText.slice(0,220));
+      if(!document.querySelector('#linkList [data-export-uart-pair="'+pair.id+'"]'))
+       throw Error('Eligible UART pair lacks explicit choose-folder button');
+
       for(let i=0;i<30&&!document.querySelector('#linkList [data-clear-signal-plan="'+pair.id+'"]');i++)await pause(80);
       // Recheck is read-only and must detect *later* firmware changes to saved plan pins.
       const buttonRecheck=document.querySelector('#linkList [data-review-saved-pins="'+pair.id+'"]');
@@ -311,7 +332,7 @@ app.whenReady().then(()=>{
       if(trace.outputs['13']!=='LOW'||trace.virtualTimeMs!==2000)throw Error('Simulator output mismatch');
       const resources=await api.resourceAnalyze(reopened,null,{intervalSeconds:10,bytesPerRecord:48,capacityBytes:1048576,retentionDays:7});
       if(resources.storage.recordsDay!==8640)throw Error('Resource advisor IPC mismatch');
-      return {passed:true,renderer:true,ipc:true,boardCatalog:true,newProjectUI:true,paletteDragDrop:true,inspectorEdit:true,persistence:true,generation:true,curatedWireGUI:true,workspaceTabUI:true,workspaceLinkUI:true,workspaceLinkAdvisorUI:true,workspaceLinkPinUI:true,workspaceSignalPlanUI:true,workspaceSignalReviewUI:true,sessionRestoreUI:true,typedVariableUI:true,analogThresholdFirmware:true,analogSimulation:true,reviewedEspGpioUI:true,typedDataLinkGUI:true,typedDataDragGUI:true,simulation:true,resources:true};
+      return {passed:true,renderer:true,ipc:true,boardCatalog:true,newProjectUI:true,paletteDragDrop:true,inspectorEdit:true,persistence:true,generation:true,curatedWireGUI:true,workspaceTabUI:true,workspaceLinkUI:true,workspaceLinkAdvisorUI:true,workspaceLinkPinUI:true,workspaceSignalPlanUI:true,workspaceSignalReviewUI:true,workspaceUartExportUI:true,sessionRestoreUI:true,typedVariableUI:true,analogThresholdFirmware:true,analogSimulation:true,reviewedEspGpioUI:true,typedDataLinkGUI:true,typedDataDragGUI:true,simulation:true,resources:true};
     })()`);
    }catch(e){report={passed:false,error:String(e?.stack||e)};}
    try{fs.writeFileSync(process.env.BLAZE_MCU_SMOKE_FILE,JSON.stringify(report,null,2));}catch(e){console.error('SMOKE REPORT WRITE FAILED',e);}
@@ -320,6 +341,17 @@ app.whenReady().then(()=>{
  }
 
  register('session:load',()=>desktopSession.load());register('session:save',state=>desktopSession.save(state));
+ register('workspace:previewUartExport',(id,linkId)=>uartWorkspaceExport.inspect(workspaceCatalog,id,linkId));
+ register('workspace:exportUartPair',async(id,linkId)=>{
+  // Only the privileged main process may select a destination path. Revalidate BEFORE
+  // and AFTER the user-selected folder dialog; never accept arbitrary renderer paths.
+  const preview=uartWorkspaceExport.inspect(workspaceCatalog,id,linkId);
+  if(!preview.eligible)throw Error('UART lab export blocked: '+preview.issues.join('; '));
+  const result=await dialog.showOpenDialog(win,{properties:['openDirectory','createDirectory'],
+   title:'Choose parent folder for NEW unflashed UART lab sketches'});
+  if(result.canceled||!result.filePaths?.length)return {canceled:true};
+  return uartWorkspaceExport.exportPair(workspaceCatalog,id,linkId,result.filePaths[0]);
+ });
  register('workspace:reviewPins',(id,linkId)=>workspaceCatalog.reviewPins(id,linkId));
  register('workspace:assignPins',(id,linkId,input)=>workspaceCatalog.assignPins(id,linkId,input));
  register('workspace:clearPins',(id,linkId)=>workspaceCatalog.clearPins(id,linkId));
