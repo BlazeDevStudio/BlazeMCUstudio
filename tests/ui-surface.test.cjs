@@ -92,3 +92,16 @@ test('bounded workspace UART export uses privileged chosen folder and source-lin
   assert(app.includes(control),control);
  assert(main.includes('workspaceUartExportUI:true'));
 });
+
+test('dual ESP32 UART export is visibly distinguished and compiled through separate CI gate',()=>{
+ const app=fs.readFileSync(path.join(root,'app.js'),'utf8');
+ const main=fs.readFileSync(path.join(__dirname,'../electron/main.cjs'),'utf8');
+ const workflow=fs.readFileSync(path.join(__dirname,'../.github/workflows/mcu-studio-ci.yml'),'utf8');
+ const pair=require('../core/uart-pair-sketches.cjs').esp32Responder;
+ assert(app.includes('Compiled lab pairing:'));
+ assert(main.includes('workspaceDualEsp32UARTUI:true'));
+ assert(workflow.includes('-not $report.workspaceDualEsp32UARTUI'));
+ assert(workflow.includes('uart-dual-esp32-compile.log'));
+ assert(workflow.includes('tests/native/uart-pair-host-test.cpp'));
+ assert(pair.source.includes('Serial1.begin(9600,SERIAL_8N1,26,25)'));
+});
