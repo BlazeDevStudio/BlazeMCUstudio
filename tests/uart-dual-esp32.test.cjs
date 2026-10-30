@@ -5,7 +5,7 @@ const {execFileSync}=require('node:child_process');
 const {WorkspaceStore}=require('../core/storage.cjs');
 const {WorkspaceCatalog}=require('../core/workspaces.cjs');
 const {inspect,exportPair,PAIRS}=require('../core/uart-workspace-export.cjs');
-const {demos,esp32Responder}=require('../core/uart-pair-sketches.cjs');
+const {SKETCHES,esp32Responder}=require('../core/uart-pair-sketches.cjs');
 const pins=(sourceTx='17',targetTx='25',targetRx='26')=>({
  orientation:'source-controller',
  source:{tx:sourceTx,rx:'16'},target:{tx:targetTx,rx:targetRx}
@@ -47,9 +47,9 @@ test('two ESP32 lab firmwares exactly match compiled shared templates and preser
  assert.equal(manifest.targetFqbn,'esp32:esp32:esp32');
  assert.deepEqual(manifest.pins.target,{tx:'25',rx:'26'});
  assert.equal(manifest.uartRouting.target,'ESP32 UART1 RX26/TX25');
- assert.deepEqual(manifest.sketches.map(s=>s.folder),[demos[0].name,esp32Responder.name]);
+ assert.deepEqual(manifest.sketches.map(s=>s.folder),[SKETCHES.esp32Initiator.name,esp32Responder.name]);
  const libraryHeader=fs.readFileSync(path.join(__dirname,'../core/firmware/BlazeUartFrame.h'),'utf8');
- for(const d of [demos[0],esp32Responder]){
+ for(const d of [SKETCHES.esp32Initiator,esp32Responder]){
   const dir=path.join(result.folder,d.name);
   assert.equal(fs.readFileSync(path.join(dir,d.name+'.ino'),'utf8'),d.source);
   assert.equal(fs.readFileSync(path.join(dir,'BlazeUartFrame.h'),'utf8'),libraryHeader);
