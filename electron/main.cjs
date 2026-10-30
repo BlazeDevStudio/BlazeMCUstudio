@@ -234,6 +234,27 @@ app.whenReady().then(()=>{
       const assigned=(await api.listWorkspaces()).find(w=>w.id===ws.id)?.links?.find(l=>l.id===pair.id)?.pins;
       if(assigned?.source?.tx!=='17'||assigned?.source?.rx!=='16'||assigned?.target?.tx!=='1'||assigned?.target?.rx!=='3')
        throw Error('GUI did not persist correct GPIO selections');
+      // The packaged GUI must preview a REAL persisted, re-reviewed UART pair.
+      const noMap=await api.previewWorkspaceUart(ws.id,planned.id);
+      if(noMap.eligible||!noMap.issues.some(x=>x.includes('Save an explicit')))
+       throw Error('UART exporter preview accepted unassigned mixed-voltage source');
+      const eligible=await api.previewWorkspaceUart(ws.id,pair.id);
+      if(!eligible.eligible||eligible.wireApproval!==false||eligible.sourceFqbn!=='esp32:esp32:esp32'
+       ||eligible.targetFqbn!=='esp8266:esp8266:generic')
+       throw Error('Valid ESP32/ESP8266 saved link not eligible for inert lab export');
+      let previewRendered=false,previewText='';
+      for(let i=0;i<60;i++){
+       if(i===0||i===20||i===40)
+        document.querySelector('#linkList [data-preview-uart-lab="'+pair.id+'"]')?.click();
+       previewText=document.querySelector('#linkList [data-uart-preview="'+pair.id+'"]')?.textContent||'';
+       if(previewText.includes('LAB EXPORT ELIGIBLE')&&previewText.includes('no wiring approval')
+        &&document.querySelector('#linkList [data-export-uart-pair="'+pair.id+'"]')){previewRendered=true;break;}
+       await pause(80);
+      }
+      if(!previewRendered)throw Error('Packaged GUI did not render reviewed UART lab export control: '+previewText.slice(0,220));
+      if(!document.querySelector('#linkList [data-export-uart-pair="'+pair.id+'"]'))
+       throw Error('Eligible UART pair lacks explicit choose-folder button');
+
       for(let i=0;i<30&&!document.querySelector('#linkList [data-clear-signal-plan="'+pair.id+'"]');i++)await pause(80);
       // Recheck is read-only and must detect *later* firmware changes to saved plan pins.
       const buttonRecheck=document.querySelector('#linkList [data-review-saved-pins="'+pair.id+'"]');
@@ -311,7 +332,7 @@ app.whenReady().then(()=>{
       if(trace.outputs['13']!=='LOW'||trace.virtualTimeMs!==2000)throw Error('Simulator output mismatch');
       const resources=await api.resourceAnalyze(reopened,null,{intervalSeconds:10,bytesPerRecord:48,capacityBytes:1048576,retentionDays:7});
       if(resources.storage.recordsDay!==8640)throw Error('Resource advisor IPC mismatch');
-      return {passed:true,renderer:true,ipc:true,boardCatalog:true,newProjectUI:true,paletteDragDrop:true,inspectorEdit:true,persistence:true,generation:true,curatedWireGUI:true,workspaceTabUI:true,workspaceLinkUI:true,workspaceLinkAdvisorUI:true,workspaceLinkPinUI:true,workspaceSignalPlanUI:true,workspaceSignalReviewUI:true,sessionRestoreUI:true,typedVariableUI:true,analogThresholdFirmware:true,analogSimulation:true,reviewedEspGpioUI:true,typedDataLinkGUI:true,typedDataDragGUI:true,simulation:true,resources:true};
+      return {passed:true,renderer:true,ipc:true,boardCatalog:true,newProjectUI:true,paletteDragDrop:true,inspectorEdit:true,persistence:true,generation:true,curatedWireGUI:true,workspaceTabUI:true,workspaceLinkUI:true,workspaceLinkAdvisorUI:true,workspaceLinkPinUI:true,workspaceSignalPlanUI:true,workspaceSignalReviewUI:true,workspaceUartExportUI:true,sessionRestoreUI:true,typedVariableUI:true,analogThresholdFirmware:true,analogSimulation:true,reviewedEspGpioUI:true,typedDataLinkGUI:true,typedDataDragGUI:true,simulation:true,resources:true};
     })()`);
    }catch(e){report={passed:false,error:String(e?.stack||e)};}
    try{fs.writeFileSync(process.env.BLAZE_MCU_SMOKE_FILE,JSON.stringify(report,null,2));}catch(e){console.error('SMOKE REPORT WRITE FAILED',e);}
