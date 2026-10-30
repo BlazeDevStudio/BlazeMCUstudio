@@ -40,7 +40,7 @@ function exportSketches(parent,sketches,{collisionLabel='UART lab demo'}={}){
  const header=fs.readFileSync(HEADER_PATH,'utf8');
  const created=[];
  try{
-  for(const {name,source,fqbn} of sketches){
+  for(const {name,source} of sketches){
    const dir=path.join(root,name);
    try{fs.mkdirSync(dir);}
    catch(e){
