@@ -162,18 +162,18 @@ jobs:
           if(-not (Test-Path $env:BLAZE_MCU_SMOKE_FILE)) { throw "Packaged Windows GUI smoke timed out; launcher pid $($process.Id)" }
           $report=Get-Content $env:BLAZE_MCU_SMOKE_FILE -Raw | ConvertFrom-Json
           Get-Content $env:BLAZE_MCU_SMOKE_FILE
-          if(-not $report.passed -or -not $report.typedDataLinkGUI -or -not $report.typedDataDragGUI -or -not $report.workspaceTabUI -or -not $report.sessionRestoreUI -or -not $report.workspaceLinkUI -or -not $report.workspaceLinkAdvisorUI -or -not $report.workspaceLinkPinUI -or -not $report.workspaceSignalPlanUI -or -not $report.workspaceSignalReviewUI -or -not $report.workspaceUartExportUI) { throw "Packaged GUI typed-socket and device-plan smoke failed: $($report.error) (linked=$($report.typedDataLinkGUI), drag=$($report.typedDataDragGUI))" }
+          if(-not $report.passed -or -not $report.typedDataLinkGUI -or -not $report.typedDataDragGUI -or -not $report.workspaceTabUI -or -not $report.sessionRestoreUI -or -not $report.workspaceLinkUI -or -not $report.workspaceLinkAdvisorUI -or -not $report.workspaceLinkPinUI -or -not $report.workspaceSignalPlanUI -or -not $report.workspaceSignalReviewUI -or -not $report.workspaceUartExportUI -or -not $report.workspaceDualEsp32UARTUI) { throw "Packaged GUI typed-socket and device-plan smoke failed: $($report.error) (linked=$($report.typedDataLinkGUI), drag=$($report.typedDataDragGUI))" }
       - name: Archive exact checked-out source
         shell: pwsh
         if: always()
         run: |
           $base='${{ steps.locate.outputs.studio_dir }}'
           $items=@("$base/core","$base/renderer","$base/electron","$base/docs","$base/tests","$base/scripts","$base/examples","$base/package.json","$base/README.md",".github/workflows/mcu-studio-ci.yml")
-          Compress-Archive -Path $items -DestinationPath "$env:RUNNER_TEMP/blaze-mcu-v0414-source.zip" -Force
+          Compress-Archive -Path $items -DestinationPath "$env:RUNNER_TEMP/blaze-mcu-v0415-source.zip" -Force
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: blaze-mcu-v0414-session-build-evidence
+          name: blaze-mcu-v0415-session-build-evidence
           path: |
             ${{ steps.locate.outputs.studio_dir }}/dist/*.exe
             ${{ runner.temp }}/arduino-compile.log
@@ -187,7 +187,7 @@ jobs:
             ${{ runner.temp }}/arduino-install.log
             ${{ runner.temp }}/sha256.txt
             ${{ runner.temp }}/blaze-mcu-gui-smoke.json
-            ${{ runner.temp }}/blaze-mcu-v0414-source.zip
+            ${{ runner.temp }}/blaze-mcu-v0415-source.zip
           if-no-files-found: warn
           retention-days: 14
 
@@ -246,6 +246,8 @@ jobs:
           g++ --version
           g++ -std=c++11 -O1 -g -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -fno-omit-frame-pointer tests/native/uart-frame-test.cpp -o "$RUNNER_TEMP/blaze-uart-native"
           "$RUNNER_TEMP/blaze-uart-native" 2>&1 | tee "$RUNNER_TEMP/uart-native-test.log"
+          g++ -std=c++11 -O1 -g -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -fno-omit-frame-pointer tests/native/uart-pair-host-test.cpp -o "$RUNNER_TEMP/blaze-uart-peers"
+          "$RUNNER_TEMP/blaze-uart-peers" 2>&1 | tee "$RUNNER_TEMP/uart-two-peer-test.log"
       - name: Install pinned Arduino CLI 1.5.1
         shell: bash
         run: |
@@ -271,10 +273,14 @@ jobs:
           arduino-cli compile --fqbn "$FQBN" --additional-urls "$INDEX" --warnings all "$RUNNER_TEMP/esp-generated/$SKETCH" 2>&1 | tee "$RUNNER_TEMP/esp-compile.log"
           node scripts/export-uart-lab.cjs "$RUNNER_TEMP/esp-generated" | tee "$RUNNER_TEMP/uart-export-manifest.txt"
           arduino-cli compile --fqbn "$FQBN" --additional-urls "$INDEX" --warnings all "$RUNNER_TEMP/esp-generated/$UART_SKETCH" 2>&1 | tee "$RUNNER_TEMP/uart-compile.log"
+          if [[ "$FQBN" == "esp32:esp32:esp32" ]]; then
+            node scripts/export-uart-esp32-responder.cjs "$RUNNER_TEMP/esp-generated" | tee "$RUNNER_TEMP/uart-dual-manifest.txt"
+            arduino-cli compile --fqbn "$FQBN" --additional-urls "$INDEX" --warnings all "$RUNNER_TEMP/esp-generated/BlazeUartEsp32Responder" 2>&1 | tee "$RUNNER_TEMP/uart-dual-esp32-compile.log"
+          fi
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: blaze-mcu-v0414-${{ matrix.family }}-compile-evidence
+          name: blaze-mcu-v0415-${{ matrix.family }}-compile-evidence
           path: |
             ${{ runner.temp }}/cli-version.txt
             ${{ runner.temp }}/generated-esp-manifest.txt
@@ -285,5 +291,8 @@ jobs:
             ${{ runner.temp }}/uart-compile.log
             ${{ runner.temp }}/uart-export-manifest.txt
             ${{ runner.temp }}/uart-native-test.log
+            ${{ runner.temp }}/uart-two-peer-test.log
+            ${{ runner.temp }}/uart-dual-manifest.txt
+            ${{ runner.temp }}/uart-dual-esp32-compile.log
           if-no-files-found: warn
           retention-days: 14
