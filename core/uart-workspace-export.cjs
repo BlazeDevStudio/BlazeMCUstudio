@@ -5,13 +5,28 @@
  */
 const fs=require('node:fs');
 const path=require('node:path');
-const {demos}=require('./uart-pair-sketches.cjs');
+const {demos,esp32Responder}=require('./uart-pair-sketches.cjs');
 const EXPECTED=Object.freeze({
  source:Object.freeze({tx:'17',rx:'16'}),
  target:Object.freeze({tx:'1',rx:'3'})
 });
 const SOURCE_BOARD='esp32:esp32:esp32';
 const TARGET_BOARD='esp8266:esp8266:generic';
+const ESP32_BOARD='esp32:esp32:esp32';
+// Deliberately bounded, per-target Arduino HardwareSerial pin routing.
+// Only these sources were independently compiled; no arbitrary GPIO mux claims.
+const PAIRS=Object.freeze({
+ [TARGET_BOARD]:Object.freeze({
+  id:'esp32-to-esp8266',source:EXPECTED.source,
+  target:EXPECTED.target,serial:'ESP8266 UART0 (shared with USB programming)',
+  sketches:Object.freeze([demos[0],demos[1]])
+ }),
+ [ESP32_BOARD]:Object.freeze({
+  id:'dual-esp32-uart1',source:EXPECTED.source,
+  target:Object.freeze({tx:'25',rx:'26'}),serial:'ESP32 UART1 RX26/TX25',
+  sketches:Object.freeze([demos[0],esp32Responder])
+ })
+});
 const WARNING='Lab-only UART examples. Physical wiring, voltage, connector, USB serial contention, communication and authentication are NOT verified.';
 function matches(actual,wanted){
  return !!actual&&Object.keys(wanted).every(k=>actual[k]===wanted[k])
@@ -30,18 +45,19 @@ function inspect(catalog,workspaceId,linkId){
   try{source=catalog.projects.open(link.from);target=catalog.projects.open(link.to);}
   catch{issues.push('One saved endpoint project is missing, corrupt or in recovery');}
  }
+ const pair=source?.fqbn===SOURCE_BOARD?PAIRS[target?.fqbn]:null;
  if(source&&target){
-  if(source.fqbn!==SOURCE_BOARD||target.fqbn!==TARGET_BOARD)
-   issues.push('Only ESP32 classic source to ESP8266 Generic target is compiled in this bounded lab');
+  if(!pair)
+   issues.push('Only ESP32 UART1 source to ESP8266 Generic or classic ESP32 UART1 target is compiled in this bounded lab');
   if(source.source?.mode!=='visual'||target.source?.mode!=='visual')
    issues.push('Manual firmware projects are not eligible for this separate lab export');
-  if(!matches(link.pins?.source,EXPECTED.source)||!matches(link.pins?.target,EXPECTED.target))
-   issues.push('This lab only supports ESP32 UART1 TX17/RX16 and ESP8266 UART0 TX1/RX3');
+  if(pair&&(!matches(link.pins?.source,pair.source)||!matches(link.pins?.target,pair.target)))
+   issues.push('This lab only supports source ESP32 UART1 TX17/RX16 and the compiled target UART pin route ('+pair.serial+')');
  }
  const details={
   workspaceId,linkId,sourceProjectId:link.from,targetProjectId:link.to,
   sourceFqbn:source?.fqbn||null,targetFqbn:target?.fqbn||null,
-  kind:link.kind,status:issues.length?'blocked':'review',
+  kind:link.kind,variant:pair?.id||null,status:issues.length?'blocked':'review',
   eligible:issues.length===0,issues:[...new Set(issues)],
   selectedPins:link.pins?structuredClone(link.pins):null,
   output:'separate lab firmware only',wireApproval:false,flashed:false,
@@ -61,7 +77,9 @@ function exportPair(catalog,workspaceId,linkId,parent){
  const staging=fs.mkdtempSync(path.join(root,'.blaze-uart-stage-'));
  try{
   const header=fs.readFileSync(path.join(__dirname,'firmware/BlazeUartFrame.h'),'utf8');
-  for(const demo of demos){
+  const selected=PAIRS[review.targetFqbn];
+  if(!selected||review.variant!==selected.id)throw Error('Unsupported UART export target variant');
+  for(const demo of selected.sketches){
    const folder=path.join(staging,demo.name);fs.mkdirSync(folder);
    fs.writeFileSync(path.join(folder,demo.name+'.ino'),demo.source,'utf8');
    fs.writeFileSync(path.join(folder,'BlazeUartFrame.h'),header,'utf8');
@@ -72,7 +90,9 @@ function exportPair(catalog,workspaceId,linkId,parent){
    sourceProjectId:review.sourceProjectId,targetProjectId:review.targetProjectId,
    sourceFqbn:review.sourceFqbn,targetFqbn:review.targetFqbn,
    pins:review.selectedPins,provenance:'reviewed persisted workspace link',
-   sketches:demos.map(d=>({folder:d.name,fqbn:d.fqbn})),
+   variant:review.variant,
+   uartRouting:{source:'ESP32 UART1 RX16/TX17',target:selected.serial},
+   sketches:selected.sketches.map(d=>({folder:d.name,fqbn:d.fqbn})),
    wireApproval:false,flashed:false,connected:false,firmwareModified:false,
    warning:WARNING
   };
@@ -89,4 +109,4 @@ function exportPair(catalog,workspaceId,linkId,parent){
    flashed:false,connected:false,sourceProjectsModified:false};
  }finally{if(fs.existsSync(staging))fs.rmSync(staging,{recursive:true,force:true});}
 }
-module.exports={EXPECTED,SOURCE_BOARD,TARGET_BOARD,inspect,exportPair};
+module.exports={EXPECTED,SOURCE_BOARD,TARGET_BOARD,ESP32_BOARD,PAIRS,inspect,exportPair};
