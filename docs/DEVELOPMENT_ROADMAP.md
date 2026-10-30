@@ -27,3 +27,7 @@ A feature is **not implemented** until its acceptance evidence exists. No future
 ## v0.4.14 — explicit guarded UART workspace lab export
 
 A saved, freshly rechecked workspace UART link matching **ESP32 classic UART1 TX17/RX16 → ESP8266 Generic UART0 TX1/RX3** can be exported as two separate PING/PONG lab Arduino sketches using an explicit native folder selector. A reusable shared template preserves the v0.4.13 independently compiled firmware source. Node regression covers source nonmutation, exact manifest, stale/unsupported maps, collisions and no overwrite. Packaged Windows GUI smoke must show the true guarded export preview. No flashing, physical validation or signed release. See [UART_FRAME_LAB.md](UART_FRAME_LAB.md).
+
+## v0.4.15 — independent dual ESP32 UART1 lab acceptance
+
+Add an ESP32 classic UART1 RX26/TX25 inert PONG responder to the existing ESP32 UART1 RX16/TX17 PING initiator. The curated workspace exporter now permits **only** the original ESP32→ESP8266 route or this reviewed ESP32→ESP32 route, and strictly matches saved TX/RX numbers. CI builds the additional actual Arduino sketch on the pinned ESP32 3.0.7 core and executes ASan/UBSan deterministic two-peer in-memory protocol tests; Windows packaged GUI checks the second variant. Wires, serial port access, flashed devices and physical UART traffic remain untested and unauthorized.
